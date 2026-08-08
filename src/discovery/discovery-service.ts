@@ -38,18 +38,17 @@ export class DiscoveryService {
     const expansion = await TopicExpander.expandTopicToQueries(persona, agentId);
     logger.info('Topic expansion generated queries', { agentId, queries: expansion.queries });
 
-    // Step B: Search live sources dynamically using expanded queries
+    // Step B: Search live sources dynamically using expanded queries (strictly past 24h)
     const searchItems = await this.webFetcher.searchAndExtract(expansion.queries);
 
-    // Also fetch baseline fallback feeds for safety
-    const rssItemsPromises = LIVE_TECH_SOURCES.slice(0, 3).map((src) => this.rssFetcher.fetchFeed(src));
-    const rssItemsNested = await Promise.all(rssItemsPromises);
-    const rssItems = rssItemsNested.flat();
-
-    const rawCandidates: NormalizedTopicItem[] = [...searchItems, ...rssItems];
+    // Enforce 24-hour cutoff
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const freshCandidates = searchItems.filter(
+      (item) => item.publishedAt && item.publishedAt >= twentyFourHoursAgo
+    );
 
     // Step C & D: Normalize and cluster into events
-    const eventClusters = EventClusterer.clusterCandidates(rawCandidates);
+    const eventClusters = EventClusterer.clusterCandidates(freshCandidates);
 
     // Step E: Score freshness, novelty, and persona fit for each event cluster
     for (const event of eventClusters) {
@@ -73,7 +72,7 @@ export class DiscoveryService {
 
     logger.info('Completed Topic-Driven Adaptive Discovery cycle for agent', {
       agentId,
-      discoveredCount: rawCandidates.length,
+      discoveredCount: freshCandidates.length,
       clustersCount: eventClusters.length,
       newTopicsCount,
     });

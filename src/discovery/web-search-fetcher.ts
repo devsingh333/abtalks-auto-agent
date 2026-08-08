@@ -9,15 +9,22 @@ export class WebSearchFetcher {
 
   /**
    * Searches live web, news, GitHub, arXiv, and RSS sources dynamically across 5 providers for a given set of queries.
+   * Only returns items published/updated in the last 24 hours.
    */
   async searchAndExtract(queries: string[]): Promise<NormalizedTopicItem[]> {
     const results: NormalizedTopicItem[] = [];
     const seenUrls = new Set<string>();
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    for (const query of queries) {
+    for (const query of queries.slice(0, 2)) {
       try {
         const queryResults = await this.searchMultiProvider(query);
         for (const item of queryResults) {
+          // Strict 24-hour freshness filter
+          if (item.publishedAt && item.publishedAt < twentyFourHoursAgo) {
+            continue;
+          }
+
           if (!seenUrls.has(item.canonicalUrl)) {
             seenUrls.add(item.canonicalUrl);
             results.push(item);
@@ -28,19 +35,18 @@ export class WebSearchFetcher {
       }
     }
 
-    logger.info('Live multi-provider discovery completed', {
+    logger.info('Live 24h freshness discovery completed', {
       queryCount: queries.length,
-      extractedTotal: results.length,
+      extractedFreshTotal: results.length,
     });
 
-    return results;
+    return results.slice(0, 10);
   }
 
   private async searchMultiProvider(query: string): Promise<NormalizedTopicItem[]> {
     const providerPromises = [
       this.searchGoogleNews(query),
       this.searchGitHub(query),
-      this.searchArxiv(query),
       this.searchHackerNews(query),
       this.searchDuckDuckGo(query),
     ];
@@ -58,23 +64,23 @@ export class WebSearchFetcher {
   }
 
   /**
-   * Provider 1: Google News Real-Time RSS Search
+   * Provider 1: Google News Real-Time RSS Search (Filtered strictly for past 24h via `when:1d`)
    */
   private async searchGoogleNews(query: string): Promise<NormalizedTopicItem[]> {
-    const encoded = encodeURIComponent(query);
+    const encoded = encodeURIComponent(`${query} when:1d`);
     const googleNewsUrl = `https://news.google.com/rss/search?q=${encoded}&hl=en-IN&gl=IN&ceid=IN:en`;
 
     try {
       const items = await this.rssDiscovery.fetchFeed({
         id: `gnews_${query.replace(/\s+/g, '_')}`,
-        name: `Google News: ${query}`,
+        name: `Google News (24h): ${query}`,
         url: googleNewsUrl,
         sourceType: 'tech_news',
       });
 
       return items.map((item) => ({
         ...item,
-        sourceName: `Google News (${query})`,
+        sourceName: `Google News (24h)`,
         sourceType: 'news',
       }));
     } catch (err) {
@@ -84,11 +90,12 @@ export class WebSearchFetcher {
   }
 
   /**
-   * Provider 2: GitHub Repository & Advisory Search API
+   * Provider 2: GitHub Repository & Advisory Search API (Filtered for updated in last 24h)
    */
   private async searchGitHub(query: string): Promise<NormalizedTopicItem[]> {
-    const encoded = encodeURIComponent(query);
-    const githubUrl = `https://api.github.com/search/repositories?q=${encoded}&sort=updated&order=desc&per_page=5`;
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const encoded = encodeURIComponent(`${query} pushed:>${yesterday}`);
+    const githubUrl = `https://api.github.com/search/repositories?q=${encoded}&sort=updated&order=desc&per_page=3`;
 
     try {
       const response = await axios.get(githubUrl, {

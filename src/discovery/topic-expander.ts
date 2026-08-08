@@ -13,7 +13,7 @@ export class TopicExpander {
    */
   static async expandTopicToQueries(persona: PersonaConfig, agentId?: string): Promise<TopicExpansionResult> {
     const prompt = `You are a senior technical research editor. 
-Given the following AI persona and domain, expand the domain into 4-6 specific, highly targeted search queries to discover current research, advisories, GitHub repos, releases, or news right now.
+Given the following AI persona and domain, generate 2-3 concise, high-precision search phrases to discover fresh breaking news, advisories, or research published in the LAST 24 HOURS.
 
 Agent Domain: ${persona.domain}
 Agent Identity: ${persona.identity}
@@ -23,25 +23,20 @@ Avoid Topics: ${persona.avoid ? persona.avoid.join(', ') : 'None'}
 Return strictly JSON in the following format:
 {
   "queries": [
-    "query 1",
-    "query 2",
-    "query 3",
-    "query 4"
+    "${persona.domain} latest disclosure",
+    "${persona.domain} vulnerability advisory"
   ],
   "subtopics": [
-    "subtopic 1",
-    "subtopic 2"
+    "${persona.domain}"
   ]
 }`;
 
     const fallback = (): TopicExpansionResult => ({
       queries: [
-        `${persona.domain} research 2026`,
         `${persona.domain} vulnerability advisory`,
-        `${persona.domain} GitHub repository release`,
-        `${persona.domain} benchmark safety analysis`,
+        `${persona.domain} research disclosure`,
       ],
-      subtopics: [persona.domain, 'Emerging Trends'],
+      subtopics: [persona.domain],
     });
 
     try {
