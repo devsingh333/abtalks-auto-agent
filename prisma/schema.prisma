@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Agent {
+  id            String   @id @default(uuid())
+  name          String
+  domain        String
+  personaConfig String   // Stored as JSON string
+  status        String   @default("active") // active, paused
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  topics Topic[]
+  posts  Post[]
+  jobs   Job[]
+
+  @@map("agents")
+}
+
+model Topic {
+  id           String    @id @default(uuid())
+  agentId      String
+  externalId   String
+  canonicalUrl String
+  title        String
+  sourceName   String
+  sourceType   String
+  publishedAt  DateTime?
+  discoveredAt DateTime  @default(now())
+  contentHash  String
+  status       String    @default("discovered") // discovered, evaluated, rejected, selected, published, failed
+  score        Float?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  agent     Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  decisions EditorialDecision[]
+  posts     Post[]
+
+  @@unique([agentId, canonicalUrl])
+  @@unique([agentId, contentHash])
+  @@map("topics")
+}
+
+model Post {
+  id        String   @id @default(uuid())
+  agentId   String
+  topicId   String
+  createdAt DateTime @default(now())
+  text      String
+  rationale String
+
+  agent   Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  topic   Topic        @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  sources PostSource[]
+
+  @@map("posts")
+}
+
+model PostSource {
+  id     String @id @default(uuid())
+  postId String
+  url    String
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("post_sources")
+}
+
+model EditorialDecision {
+  id        String   @id @default(uuid())
+  topicId   String
+  decision  String   // publish, reject
+  scores    String   // JSON string of scores breakdown
+  reason    String
+  model     String
+  createdAt DateTime @default(now())
+
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@map("editorial_decisions")
+}
+
+model Job {
+  id         String    @id @default(uuid())
+  agentId    String
+  type       String    // discovery, evaluation, publish
+  status     String    @default("pending") // pending, running, completed, failed
+  attempts   Int       @default(0)
+  runAt      DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+  error      String?
+  createdAt  DateTime  @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("jobs")
+}
