@@ -233,21 +233,26 @@ export default function App() {
         ))}
       </div>
 
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#07070a]/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 p-0.5 shadow-lg shadow-indigo-500/20">
-              <div className="w-full h-full bg-[#090912] rounded-[10px] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-indigo-400" />
+      {/* Upgraded Header */}
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#07070a]/90 backdrop-blur-2xl shadow-xl shadow-black/40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 via-indigo-600 to-purple-600 p-0.5 shadow-lg shadow-indigo-500/25">
+              <div className="w-full h-full bg-[#090912] rounded-[14px] flex items-center justify-center">
+                <Cpu className="w-5 h-5 text-emerald-400" />
               </div>
             </div>
             <div>
-              <h1 className="font-extrabold text-base tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                ABTalks Autonomous Agent Command Center
-              </h1>
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
+                <h1 className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
+                  ABTalks Autonomous Agent Command Center
+                </h1>
+                <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                  NVIDIA Build API Active
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
+                <span className="flex items-center gap-1.5 font-medium text-emerald-400">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -255,29 +260,31 @@ export default function App() {
                   Live Sync (5s)
                 </span>
                 <span>•</span>
-                <span>Updated {lastUpdated.toLocaleTimeString()}</span>
+                <span className="font-mono text-slate-400">Updated {lastUpdated.toLocaleTimeString()}</span>
+                <span className="hidden sm:inline">•</span>
+                <span className="hidden sm:inline font-mono text-slate-500">Model: nvidia/nemotron-3-ultra-550b</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative hidden sm:block">
+          <div className="flex items-center gap-3">
+            <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search topics, agents, posts..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-white/[0.04] border border-white/10 rounded-lg pl-9 pr-4 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-colors w-64 placeholder:text-slate-500"
+                className="bg-white/[0.05] border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500/60 focus:bg-white/[0.08] transition-all w-48 sm:w-64 lg:w-72 placeholder:text-slate-500"
               />
             </div>
-            
+
             <button
               onClick={fetchData}
-              className="p-2 rounded-lg bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] text-slate-300 hover:text-white transition-colors"
-              title="Refresh Data"
+              className="p-2.5 rounded-xl bg-white/[0.05] border border-white/10 hover:bg-white/[0.1] text-slate-300 hover:text-white transition-all shadow-sm flex items-center justify-center"
+              title="Refresh Data Now"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-400' : ''}`} />
             </button>
           </div>
         </div>

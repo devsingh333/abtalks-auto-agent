@@ -1,4 +1,5 @@
 import { Topic, Agent } from '@prisma/client';
+import { env } from '../config/env';
 import { PersonaConfig } from '../database/repositories/agent-repository';
 import { CandidateScorer } from './candidate-scorer';
 import { NoveltyChecker } from './novelty-checker';
@@ -99,7 +100,7 @@ export class EditorialEngine {
 
     // Record decision in database
     await TopicRepository.updateStatus(topic.id, finalDecision === 'publish' ? 'selected' : 'rejected', finalScore);
-    await TopicRepository.recordDecision(topic.id, finalDecision, { ...detResult.breakdown, ...modelEval.scores }, modelEval.reason, 'gemini-2.5-flash');
+    await TopicRepository.recordDecision(topic.id, finalDecision, { ...detResult.breakdown, ...modelEval.scores }, modelEval.reason, env.NVIDIA_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b');
 
     if (finalDecision === 'reject') {
       await MemoryService.recordRejectedTopicMemory(agent.id, topic.title, modelEval.reason);
