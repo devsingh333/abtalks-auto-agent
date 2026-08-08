@@ -177,7 +177,39 @@ export default function App() {
       addToast(`Error: ${err.message}`, 'error');
     } finally {
       setActionLoading((prev) => ({ ...prev, [key]: false }));
-      if (action === 'delete') setDeleteModalAgent(null);
+    }
+  };
+
+  const handleCreateSampleAgent = async (name: string, domain: string) => {
+    setActionLoading((prev) => ({ ...prev, createSample: true }));
+    try {
+      const res = await fetch('/api/agent/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          persona: {
+            name,
+            domain,
+            identity: `Autonomous Technical Researcher for ${domain}`,
+            interests: [domain, 'Security Research', 'System Vulnerabilities', 'Emerging Tech'],
+            avoid: ['Off-topic marketing', 'Generic hype'],
+            editorialPrinciples: ['Technical depth', 'Fact-based evidence', 'Timely disclosures'],
+            voice: { tone: 'analytical', length: 'concise', style: 'expert' },
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to initialize agent');
+      }
+
+      addToast(`Created agent: ${name}`, 'success');
+      await fetchData();
+    } catch (err: any) {
+      addToast(`Error: ${err.message}`, 'error');
+    } finally {
+      setActionLoading((prev) => ({ ...prev, createSample: false }));
     }
   };
 
@@ -384,11 +416,44 @@ export default function App() {
             <span className="text-xs text-slate-400">{overview?.agents.length || 0} active workers</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {overview?.agents.map((agent, index) => {
-              const theme = AGENT_COLORS[index % AGENT_COLORS.length];
-              const isPaused = agent.status === 'paused';
-              const stats = agent.stats || {};
+          {!overview?.agents || overview.agents.length === 0 ? (
+            <div className="glass-panel rounded-2xl p-8 text-center space-y-4 border border-dashed border-white/20">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400">
+                <Bot className="w-6 h-6" />
+              </div>
+              <div className="space-y-1 max-w-md mx-auto">
+                <h3 className="font-bold text-base text-white">No Active Agents Found</h3>
+                <p className="text-xs text-slate-400">
+                  There are currently no active autonomous AI persona agents in the database. Initialize a new agent below to launch dynamic discovery.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center gap-3 pt-2 flex-wrap">
+                <button
+                  onClick={() => handleCreateSampleAgent('AI Security Researcher', 'AI Security')}
+                  disabled={actionLoading.createSample}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Create AI Security Agent</span>
+                </button>
+
+                <button
+                  onClick={() => handleCreateSampleAgent('System Security Researcher', 'System Security')}
+                  disabled={actionLoading.createSample}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Create System Security Agent</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {overview.agents.map((agent, index) => {
+                const theme = AGENT_COLORS[index % AGENT_COLORS.length];
+                const isPaused = agent.status === 'paused';
+                const stats = agent.stats || {};
 
               return (
                 <div
@@ -492,7 +557,8 @@ export default function App() {
               );
             })}
           </div>
-        </section>
+        )}
+      </section>
 
         {/* Main Grid: Published Posts & Activity Log */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
