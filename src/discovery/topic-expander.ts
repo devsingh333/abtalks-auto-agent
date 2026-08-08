@@ -9,41 +9,143 @@ export interface TopicExpansionResult {
 
 export class TopicExpander {
   /**
-   * Expands an agent's domain & persona into dynamic, targeted search queries tailored 100% to its specific domain.
+   * Expands an agent's domain & persona into high-quality discovery queries using the comprehensive prompt.
    */
   static async expandTopicToQueries(persona: PersonaConfig, agentId?: string): Promise<TopicExpansionResult> {
-    const prompt = `You are a professional editorial curator.
-Given the following agent domain and persona details, generate 2-3 concise, natural search queries to discover breaking updates, news, releases, or developments published in the LAST 24 HOURS.
+    const prompt = `
+You are the discovery-query planner for an autonomous AI/technology research agent.
 
-Agent Domain: ${persona.domain}
-Agent Identity: ${persona.identity}
-Key Interests: ${persona.interests ? persona.interests.join(', ') : persona.domain}
-Avoid Topics: ${persona.avoid ? persona.avoid.join(', ') : 'None'}
+Your task is to generate high-quality web-search queries that help the agent discover
+FRESH, RELEVANT, and INFORMATION-DENSE developments specifically within:
 
-CRITICAL INSTRUCTIONS:
-- Tailor the queries strictly to "${persona.domain}".
-- DO NOT add words like "vulnerability", "advisory", "exploit", or "security" UNLESS the agent domain is explicitly security related.
-- Keep queries natural and focused on what someone would search to find the latest updates for "${persona.domain}".
+DOMAIN:
+"${persona.domain}"
 
-Return strictly JSON in the following format:
+${persona.interests?.length
+  ? `CURRENT INTERESTS:
+${persona.interests.map((interest) => `- ${interest}`).join("\n")}`
+  : ""}
+
+OBJECTIVE:
+Find information that has changed recently, newly emerged, or become important within
+the specified domain. The queries will be sent to a live web search system, so they
+must be useful as actual search queries rather than descriptions of what to search.
+
+QUERY REQUIREMENTS:
+
+1. DOMAIN FOCUS
+   - Every query must have a clear connection to "${persona.domain}".
+   - Do not drift into unrelated technology domains.
+   - Use the provided interests as additional context when they improve relevance.
+
+2. FRESHNESS
+   - Prioritize recent developments, announcements, releases, research, discoveries,
+     breakthroughs, updates, launches, changes, benchmarks, and significant events.
+   - Prefer queries containing natural freshness signals such as:
+     "latest", "recent", "new", "announced", "released", "2026", or equivalent wording
+     when appropriate.
+   - Do not make every query identical by simply appending "latest news".
+
+3. QUERY DIVERSITY
+   Generate complementary queries covering different discovery angles.
+   For example:
+   - broad recent developments
+   - major announcements or releases
+   - newly published research
+   - important technical developments
+   - emerging trends
+   - notable organizations, projects, or technologies
+   - practical industry developments
+
+   Do NOT generate near-duplicate queries.
+
+4. NATURAL SEARCH LANGUAGE
+   - Write queries as a knowledgeable human researcher would actually type into a
+     search engine.
+   - Keep queries concise and information-dense.
+   - Avoid unnecessary conversational language.
+   - Do not write questions unless a question is genuinely useful for discovery.
+
+5. DOMAIN-SPECIFIC TERMINOLOGY
+   - Use terminology that naturally belongs to "${persona.domain}".
+   - DO NOT inject security terminology such as:
+     "vulnerability", "exploit", "advisory", "attack", "threat", or "security"
+     unless "${persona.domain}" or the provided interests are explicitly security-related.
+   - Do not inject research terminology such as "paper", "benchmark", or "arXiv"
+     into every query unless it is appropriate for the domain.
+   - Do not assume the domain is AI security merely because it is an AI-related domain.
+
+6. SOURCE DISCOVERY
+   - Queries should be broad enough to discover sources that the agent does not
+     already know about.
+   - Do not hardcode specific websites or organizations unless they are strongly
+     implied by the domain or interests.
+   - Do not restrict all queries to the same source type.
+
+7. SIGNAL OVER VOLUME
+   - Prefer queries likely to surface meaningful developments over generic content,
+     opinion pieces, evergreen explainers, tutorials, or promotional material.
+   - Avoid queries that primarily return old educational content.
+
+8. SUBTOPICS
+   - Return a small set of useful subtopics that represent important areas within
+     the domain.
+   - Subtopics must be specific enough to guide future discovery but broad enough
+     to remain useful across multiple discovery cycles.
+   - Do not invent unrelated subtopics.
+
+9. OUTPUT
+   - Return ONLY valid JSON.
+   - Do not include Markdown.
+   - Do not include explanations.
+   - Do not include comments.
+   - Do not include additional fields.
+   - Generate 5-8 queries.
+   - Generate 3-6 subtopics.
+   - Each query must be unique.
+   - Each subtopic must be unique.
+
+OUTPUT FORMAT:
 {
   "queries": [
-    "${persona.domain} latest news",
-    "${persona.domain} recent updates"
+    "query 1",
+    "query 2",
+    "query 3",
+    "query 4",
+    "query 5"
   ],
   "subtopics": [
-    "${persona.domain}"
+    "subtopic 1",
+    "subtopic 2",
+    "subtopic 3"
   ]
-}`;
+}
+
+QUALITY CHECK BEFORE RESPONDING:
+
+- Is every query relevant to "${persona.domain}"?
+- Do the queries collectively cover different discovery angles?
+- Are they genuinely useful for finding recent information?
+- Have you avoided unnecessary security terminology?
+- Have you avoided near-duplicate queries?
+- Could these queries discover sources the agent does not already know?
+- Are the subtopics genuinely related to the domain?
+- Is the response valid JSON with ONLY "queries" and "subtopics"?
+
+Return the JSON now.
+`;
 
     const fallback = (): TopicExpansionResult => {
       const primaryInterest = persona.interests && persona.interests.length > 0 ? persona.interests[0] : persona.domain;
       return {
         queries: [
-          `${persona.domain} latest news`,
-          `${primaryInterest} updates`,
+          `${persona.domain} latest developments 2026`,
+          `${persona.domain} new announcements`,
+          `${primaryInterest} recent updates`,
+          `${persona.domain} emerging trends`,
+          `${persona.domain} major releases`,
         ],
-        subtopics: [persona.domain],
+        subtopics: [persona.domain, primaryInterest, 'Industry Trends'],
       };
     };
 
@@ -52,7 +154,7 @@ Return strictly JSON in the following format:
       logger.info('Expanded topic into dynamic search queries', {
         agentId,
         domain: persona.domain,
-        queryCount: result.queries.length,
+        queryCount: result.queries?.length || 0,
         queries: result.queries,
       });
       return result;
