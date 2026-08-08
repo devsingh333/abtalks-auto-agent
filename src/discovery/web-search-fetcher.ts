@@ -62,7 +62,7 @@ export class WebSearchFetcher {
    */
   private async searchGoogleNews(query: string): Promise<NormalizedTopicItem[]> {
     const encoded = encodeURIComponent(query);
-    const googleNewsUrl = `https://news.google.com/rss/search?q=${encoded}&hl=en-US&gl=US&ceid=US:en`;
+    const googleNewsUrl = `https://news.google.com/rss/search?q=${encoded}&hl=en-IN&gl=IN&ceid=IN:en`;
 
     try {
       const items = await this.rssDiscovery.fetchFeed({
