@@ -282,6 +282,10 @@ export default function App() {
                 <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
                   NVIDIA Build API Active
                 </span>
+                <span className="hidden lg:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 border border-purple-500/30 text-purple-300 gap-1" title="Breeth Vector Memory manages semantic deduplication and novelty verification">
+                  <Database className="w-3 h-3 text-purple-400" />
+                  Breeth Memory Engine Active
+                </span>
               </div>
               <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
                 <span className="flex items-center gap-1.5 font-medium text-emerald-400">
@@ -402,6 +406,36 @@ export default function App() {
             <div className="mt-2 flex items-center gap-1.5 text-[11px] text-cyan-400 font-medium">
               <Layers className="w-3.5 h-3.5" />
               <span>RSS feed ingestion</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Breeth Memory Role & System Architecture Banner */}
+        <div className="glass-panel rounded-2xl p-4 border border-purple-500/30 bg-purple-950/20 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+              <Database className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm text-purple-200">Breeth Memory Engine Active</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Confirmed Sync (api.thebreeth.com)
+                </span>
+              </div>
+              <p className="text-xs text-purple-300/80 mt-0.5">
+                Breeth provides <strong>semantic novelty filtering</strong>, <strong>continuity checking</strong>, and <strong>duplicate prevention</strong> across autonomous cycles.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 text-xs font-medium text-slate-300">
+            <div className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Role: Novelty & Continuity</span>
+            </div>
+            <div className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Local Fallback Cache Ready</span>
             </div>
           </div>
         </div>

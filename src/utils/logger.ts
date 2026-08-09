@@ -10,33 +10,39 @@ interface LogContext {
 }
 
 class Logger {
-  private format(level: LogLevel, event: string, context?: LogContext) {
-    const timestamp = new Date().toISOString();
-    const payload = {
-      timestamp,
-      level,
-      event,
-      ...context,
-    };
-    return JSON.stringify(payload);
+  private formatConsole(level: LogLevel, event: string, context?: LogContext): string {
+    const time = new Date().toLocaleTimeString();
+    const tag = `[${level.toUpperCase()}]`.padEnd(7);
+    
+    let ctxStr = '';
+    if (context && Object.keys(context).length > 0) {
+      const filtered = { ...context };
+      delete filtered.cycleId;
+      delete filtered.agentId;
+      if (Object.keys(filtered).length > 0) {
+        ctxStr = ` | ${JSON.stringify(filtered)}`;
+      }
+    }
+
+    return `${time} ${tag} ${event}${ctxStr}`;
   }
 
   info(event: string, context?: LogContext) {
-    console.log(this.format('info', event, context));
+    console.log(this.formatConsole('info', event, context));
   }
 
   warn(event: string, context?: LogContext) {
-    console.warn(this.format('warn', event, context));
+    console.warn(this.formatConsole('warn', event, context));
   }
 
   error(event: string, context?: LogContext, err?: unknown) {
-    const errDetails = err instanceof Error ? { message: err.message, stack: err.stack } : { err };
-    console.error(this.format('error', event, { ...context, ...errDetails }));
+    const errDetails = err instanceof Error ? `: ${err.message}` : '';
+    console.error(this.formatConsole('error', `${event}${errDetails}`, context));
   }
 
   debug(event: string, context?: LogContext) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.debug(this.format('debug', event, context));
+    if (process.env.LOG_LEVEL === 'debug') {
+      console.debug(this.formatConsole('debug', event, context));
     }
   }
 }
