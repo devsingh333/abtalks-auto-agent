@@ -29,6 +29,8 @@ import {
   Compass,
   Copy,
   Check,
+  UserCheck,
+  Plus,
 } from 'lucide-react';
 
 interface AgentStats {
@@ -41,12 +43,29 @@ interface AgentStats {
   postsToday: number;
 }
 
+interface PersonaConfig {
+  name: string;
+  role?: string;
+  domain: string;
+  identity: string;
+  interests: string[];
+  avoid?: string[];
+  editorialPrinciples?: string[];
+  voice?: {
+    tone: string;
+    length: string;
+    style: string;
+    stance?: string;
+  };
+}
+
 interface Agent {
   id: string;
   name: string;
   domain: string;
   status: 'active' | 'paused';
   createdAt: string;
+  personaConfig?: string;
   stats: AgentStats;
 }
 
@@ -90,10 +109,6 @@ interface Toast {
   type: 'info' | 'success' | 'error';
 }
 
-/**
- * Orbix Logo SVG Component
- */
-
 export default function App() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
@@ -105,9 +120,11 @@ export default function App() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState<boolean>(false);
   const [showGuide, setShowGuide] = useState<boolean>(false);
   const [showControlsHelp, setShowControlsHelp] = useState<boolean>(false);
+  const [showNewPersonaModal, setShowNewPersonaModal] = useState<boolean>(false);
   const [copiedAgentId, setCopiedAgentId] = useState<string | null>(null);
   const [expandedReasonIdx, setExpandedReasonIdx] = useState<number | null>(null);
   const [selectedPostDetails, setSelectedPostDetails] = useState<PostItem | null>(null);
+  const [selectedAgentPersona, setSelectedAgentPersona] = useState<{ agentName: string; persona: PersonaConfig } | null>(null);
   const [activityFilter, setActivityFilter] = useState<'all' | 'topic_selected' | 'topic_rejected'>('all');
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
@@ -197,23 +214,13 @@ export default function App() {
     }
   };
 
-  const handleCreateSampleAgent = async (name: string, domain: string) => {
-    setActionLoading((prev) => ({ ...prev, createSample: true }));
+  const handleInitPresetAgent = async (presetKey: string) => {
+    setActionLoading((prev) => ({ ...prev, initPreset: true }));
     try {
       const res = await fetch('/api/agent/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          persona: {
-            name,
-            domain,
-            identity: `Autonomous Technical Researcher for ${domain}`,
-            interests: [domain, 'Security Research', 'System Vulnerabilities', 'Emerging Tech'],
-            avoid: ['Off-topic marketing', 'Generic hype'],
-            editorialPrinciples: ['Technical depth', 'Fact-based evidence', 'Timely disclosures'],
-            voice: { tone: 'analytical', length: 'concise', style: 'expert' },
-          },
-        }),
+        body: JSON.stringify({ presetKey }),
       });
 
       if (!res.ok) {
@@ -221,12 +228,14 @@ export default function App() {
         throw new Error(data.error || 'Failed to initialize agent');
       }
 
-      addToast(`Created agent: ${name}`, 'success');
+      const data = await res.json();
+      addToast(`Initialized Persona Agent: ${data.agentId.substring(0, 8)}`, 'success');
+      setShowNewPersonaModal(false);
       await fetchData();
     } catch (err: any) {
       addToast(`Error: ${err.message}`, 'error');
     } finally {
-      setActionLoading((prev) => ({ ...prev, createSample: false }));
+      setActionLoading((prev) => ({ ...prev, initPreset: false }));
     }
   };
 
@@ -303,6 +312,15 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* New Persona Agent Button */}
+            <button
+              onClick={() => setShowNewPersonaModal(true)}
+              className="px-3 py-1.5 rounded-lg bg-indigo-600/20 border border-indigo-500/30 hover:bg-indigo-600/30 text-indigo-200 text-xs font-medium transition-colors flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="hidden sm:inline">Launch Persona</span>
+            </button>
+
             {/* Guide Toggle Button */}
             <button
               onClick={() => setShowGuide(!showGuide)}
@@ -332,7 +350,7 @@ export default function App() {
               {mobileSearchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
             </button>
 
-            {/* Refresh Button with Active Toast Feedback */}
+            {/* Refresh Button */}
             <button
               onClick={handleManualRefresh}
               className="p-2 rounded-lg bg-zinc-900 border border-white/[0.06] hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors shrink-0"
@@ -425,7 +443,7 @@ export default function App() {
             <div className="text-2xl sm:text-3xl font-bold text-zinc-100 font-mono">
               {overview?.systemStats.totalAgents ?? 0}
             </div>
-            <div className="text-[11px] text-zinc-500">Running Workers</div>
+            <div className="text-[11px] text-zinc-500 font-mono">Recognizable Identities</div>
           </div>
 
           <div className="p-4 sm:p-5 rounded-xl border border-white/[0.06] bg-white/[0.01] space-y-1">
@@ -495,18 +513,18 @@ export default function App() {
                   <p>No active agents configured in database.</p>
                   <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
                     <button
-                      onClick={() => handleCreateSampleAgent('AI Security Researcher', 'AI Security')}
-                      disabled={actionLoading.createSample}
+                      onClick={() => handleInitPresetAgent('ai_security')}
+                      disabled={actionLoading.initPreset}
                       className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-white/[0.08] hover:bg-zinc-800 text-zinc-200 text-xs transition-colors"
                     >
-                      + AI Security Agent
+                      + Dr. Elena Vance (AI Security)
                     </button>
                     <button
-                      onClick={() => handleCreateSampleAgent('AI Infrastructure Analyst', 'AI Infrastructure')}
-                      disabled={actionLoading.createSample}
+                      onClick={() => handleInitPresetAgent('ml_systems')}
+                      disabled={actionLoading.initPreset}
                       className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-white/[0.08] hover:bg-zinc-800 text-zinc-200 text-xs transition-colors"
                     >
-                      + AI Infra Agent
+                      + Dr. Maya Lin (ML Systems)
                     </button>
                   </div>
                 </div>
@@ -517,6 +535,10 @@ export default function App() {
                       const isPaused = agent.status === 'paused';
                       const stats = agent.stats || {};
                       const isCopied = copiedAgentId === agent.id;
+                      let parsedPersona: PersonaConfig | null = null;
+                      try {
+                        if (agent.personaConfig) parsedPersona = JSON.parse(agent.personaConfig);
+                      } catch (e) {}
 
                       return (
                         <div
@@ -532,7 +554,9 @@ export default function App() {
                                   <span className={`w-2 h-2 rounded-full shrink-0 ${isPaused ? 'bg-amber-500' : 'bg-emerald-500'}`} />
                                   <h3 className="font-semibold text-xs sm:text-sm text-zinc-100 truncate">{agent.name}</h3>
                                 </div>
-                                <span className="text-xs text-zinc-500 font-mono block mt-1 truncate">{agent.domain}</span>
+                                <span className="text-xs text-zinc-400 font-mono block mt-0.5 truncate">
+                                  {parsedPersona?.role || agent.domain}
+                                </span>
                               </div>
                               <span className="text-[11px] font-mono text-zinc-400 shrink-0">
                                 {agent.status}
@@ -572,14 +596,24 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Breeth Memory Role Integration */}
-                            <div className="text-[11px] font-mono text-zinc-500 border-t border-white/[0.04] pt-2 flex items-center gap-1.5">
-                              <Database className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                              <span className="truncate">Breeth Memory: Novelty & Deduplication</span>
+                            {/* Consistent Persona & Breeth Role Integration */}
+                            <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between text-[11px] font-mono">
+                              <span className="text-zinc-500 flex items-center gap-1.5 truncate">
+                                <Database className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                                <span className="truncate">Breeth Novelty Checked</span>
+                              </span>
+                              {parsedPersona && (
+                                <button
+                                  onClick={() => setSelectedAgentPersona({ agentName: agent.name, persona: parsedPersona! })}
+                                  className="text-indigo-400 hover:text-indigo-300 underline font-sans text-xs shrink-0"
+                                >
+                                  Persona Stance
+                                </button>
+                              )}
                             </div>
                           </div>
 
-                          {/* Responsive Action Buttons */}
+                          {/* Action Buttons */}
                           <div className="flex items-center justify-between pt-3 border-t border-white/[0.04] mt-3 text-xs">
                             <div className="flex items-center gap-2">
                               {isPaused ? (
@@ -783,7 +817,148 @@ export default function App() {
         </div>
       </main>
 
-      {/* React Portal Modal for Published Post Rationale & Score Details */}
+      {/* Modal: Launch New Original Persona Agent */}
+      {showNewPersonaModal &&
+        ReactDOM.createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative">
+              <button
+                onClick={() => setShowNewPersonaModal(false)}
+                className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100 border-b border-white/[0.08] pb-3">
+                <UserCheck className="w-4 h-4 text-indigo-400" />
+                <span>Launch Original AI & Technology Persona Agent</span>
+              </div>
+
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Select an original persona identity to initialize an autonomous research agent with a consistent writing voice, stable technical interests, and distinct editorial stance:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div
+                  onClick={() => handleInitPresetAgent('ai_security')}
+                  className="p-4 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:border-indigo-500/50 hover:bg-indigo-500/5 cursor-pointer transition-all space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-zinc-100">Dr. Elena Vance</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">AI Security</span>
+                  </div>
+                  <span className="text-xs text-zinc-400 font-mono block">Senior AI Security Researcher</span>
+                  <p className="text-[11px] text-zinc-500 leading-normal">Focuses on LLM prompt injection, adversarial machine learning, model poisoning, and CVE disclosures.</p>
+                </div>
+
+                <div
+                  onClick={() => handleInitPresetAgent('ml_systems')}
+                  className="p-4 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:border-emerald-500/50 hover:bg-emerald-500/5 cursor-pointer transition-all space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-zinc-100">Dr. Maya Lin</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">ML Systems</span>
+                  </div>
+                  <span className="text-xs text-zinc-400 font-mono block">ML Systems Architect</span>
+                  <p className="text-[11px] text-zinc-500 leading-normal">Focuses on open weights, vLLM quantization, PyTorch performance, and reproducible ML benchmarks.</p>
+                </div>
+
+                <div
+                  onClick={() => handleInitPresetAgent('ai_infrastructure')}
+                  className="p-4 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:border-amber-500/50 hover:bg-amber-500/5 cursor-pointer transition-all space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-zinc-100">Marcus Chen</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">AI Infra</span>
+                  </div>
+                  <span className="text-xs text-zinc-400 font-mono block">AI Infrastructure Analyst</span>
+                  <p className="text-[11px] text-zinc-500 leading-normal">Focuses on GPU clusters, interconnect topologies, distributed training compute scaling, and TCO.</p>
+                </div>
+
+                <div
+                  onClick={() => handleInitPresetAgent('robotics_ai')}
+                  className="p-4 rounded-lg border border-white/[0.08] bg-white/[0.02] hover:border-purple-500/50 hover:bg-purple-500/5 cursor-pointer transition-all space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-zinc-100">Alex Rivera</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">Robotics</span>
+                  </div>
+                  <span className="text-xs text-zinc-400 font-mono block">Robotics & Embodied AI Engineer</span>
+                  <p className="text-[11px] text-zinc-500 leading-normal">Focuses on Vision-Language-Action (VLA) models, spatial intelligence, ROS 2, and physical robot deployments.</p>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Modal: View Active Persona Profile & Stance */}
+      {selectedAgentPersona &&
+        ReactDOM.createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative">
+              <button
+                onClick={() => setSelectedAgentPersona(null)}
+                className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100 border-b border-white/[0.08] pb-3">
+                <UserCheck className="w-4 h-4 text-indigo-400" />
+                <span>Persona Profile & Editorial Stance</span>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <span className="text-[11px] text-zinc-500 font-mono block">Persona Identity:</span>
+                  <span className="font-semibold text-zinc-100 text-sm">{selectedAgentPersona.persona.name}</span>
+                  {selectedAgentPersona.persona.role && (
+                    <span className="text-xs text-indigo-400 font-mono block mt-0.5">{selectedAgentPersona.persona.role}</span>
+                  )}
+                  <p className="text-zinc-300 text-xs leading-relaxed mt-1">{selectedAgentPersona.persona.identity}</p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] text-zinc-500 font-mono block">Stable Technical Interests:</span>
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    {selectedAgentPersona.persona.interests.map((interest, idx) => (
+                      <span key={idx} className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[11px] font-mono">
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {selectedAgentPersona.persona.editorialPrinciples && (
+                  <div>
+                    <span className="text-[11px] text-zinc-500 font-mono block">Distinct Editorial Principles:</span>
+                    <ul className="list-disc list-inside text-zinc-300 space-y-1 mt-1 text-[11px]">
+                      {selectedAgentPersona.persona.editorialPrinciples.map((p, i) => (
+                        <li key={i}>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {selectedAgentPersona.persona.voice && (
+                  <div className="p-3 rounded bg-zinc-950 border border-white/[0.06] space-y-1 font-mono text-[11px]">
+                    <span className="text-emerald-400 font-semibold block">Writing Style & Voice Guidelines:</span>
+                    <div>Tone: <span className="text-zinc-300">{selectedAgentPersona.persona.voice.tone}</span></div>
+                    <div>Style: <span className="text-zinc-300">{selectedAgentPersona.persona.voice.style}</span></div>
+                    <div>Target Length: <span className="text-zinc-300">{selectedAgentPersona.persona.voice.length}</span></div>
+                    {selectedAgentPersona.persona.voice.stance && (
+                      <div>Editorial Stance: <span className="text-zinc-300">{selectedAgentPersona.persona.voice.stance}</span></div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Modal: Published Post Rationale Details */}
       {selectedPostDetails &&
         ReactDOM.createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">

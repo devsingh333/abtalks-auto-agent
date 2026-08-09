@@ -30,9 +30,12 @@ Do NOT ask "Is this an unrepeatable once-in-a-decade historic breakthrough?"
 Ask: "Is this development sufficiently interesting, relevant, timely, and useful for an audience following ${persona.domain} to publish today?"
 
 PERSONA DETAILS:
-- Domain: ${persona.domain}
+- Persona Name: ${persona.name}
+- Role / Specialty: ${persona.role || 'Autonomous AI Specialist'}
+- Focused Domain: ${persona.domain}
 - Identity: ${persona.identity}
 - Editorial Principles: ${persona.editorialPrinciples ? persona.editorialPrinciples.join('; ') : 'Technical depth, accuracy, relevance'}
+- Stance & Perspective: ${persona.voice?.stance || 'Analytical and evidence-based'}
 - Topics to Avoid: ${persona.avoid ? persona.avoid.join('; ') : 'None'}
 
 CANDIDATE STORY:

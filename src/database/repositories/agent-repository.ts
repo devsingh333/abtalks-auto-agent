@@ -3,6 +3,7 @@ import { Agent } from '@prisma/client';
 
 export interface PersonaConfig {
   name: string;
+  role?: string;
   domain: string;
   identity: string;
   interests: string[];
@@ -12,6 +13,7 @@ export interface PersonaConfig {
     tone: string;
     length: string;
     style: string;
+    stance?: string;
   };
 }
 
