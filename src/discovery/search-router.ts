@@ -5,6 +5,7 @@ import { NormalizedTopicItem } from './source-normalizer';
 import { RssDiscovery } from './rss-discovery';
 import { DiscoveryPlan, SourceStrategy } from './discovery-plan';
 import { EntityRelevanceGate } from './entity-relevance-gate';
+import { isJunkSourceDomain } from '../editorial/source-quality';
 
 export interface ProviderExecutionStats {
   providersAttempted: number;
@@ -23,8 +24,9 @@ export class SearchRouter {
   private rssDiscovery = new RssDiscovery();
 
   /**
-   * Routes search queries to providers according to the Discovery Plan strategies.
-   * Maximizes recall first, applies hard entity relevance gate, and performs adaptive retry if needed.
+   * High-Precision Intent-Driven Search Router.
+   * Uses Google News RSS as the primary high-volume discovery engine.
+   * Filters out junk domains and routes persona-specific queries (arXiv, GitHub, HackerNews, Official RSS).
    */
   async executeDiscoveryPlan(
     plan: DiscoveryPlan,
@@ -38,28 +40,32 @@ export class SearchRouter {
       failedProviderDetails: [],
     };
 
-    // Round 1: Execute initial queries from plan
+    // Round 1: Execute intent-routed queries
     let candidates = await this.runSearchRound(plan, interests, stats);
 
-    // Adaptive Search Retry (Round 2) if Round 1 yields 0 relevant candidates
+    // Adaptive Search Retry (Round 2) if Round 1 yields 0 candidates
     if (candidates.length === 0) {
-      logger.warn('Round 1 search produced 0 relevant candidates. Triggering Round 2 adaptive query reformulation', {
+      logger.info('Round 1 search yielded 0 candidates. Executing Round 2 adaptive query fallback via Google News', {
         targetEntity: plan.targetEntity,
       });
 
       roundsExecuted = 2;
-      const reformulatedPlan: DiscoveryPlan = {
+      const fallbackPlan: DiscoveryPlan = {
         ...plan,
-        intents: plan.intents.map((intent) => ({
-          ...intent,
-          queries: [
-            `${plan.targetEntity} latest news 2026`,
-            `${plan.targetEntity} recent announcement`,
-          ],
-        })),
+        intents: [
+          {
+            intentName: 'High Signal Recent News',
+            category: 'news',
+            queries: [
+              `${plan.targetEntity} latest news 2026`,
+              `${plan.targetEntity} recent announcement`,
+            ],
+            sourceStrategy: ['news'],
+          },
+        ],
       };
 
-      candidates = await this.runSearchRound(reformulatedPlan, interests, stats);
+      candidates = await this.runSearchRound(fallbackPlan, interests, stats);
     }
 
     return {
@@ -86,6 +92,12 @@ export class SearchRouter {
             stats.providersSuccessful++;
 
             for (const item of items) {
+              // 1. Source Quality Pre-Filter: Reject junk/spam domains immediately
+              if (isJunkSourceDomain(item.canonicalUrl, item.title)) {
+                logger.debug('Filtered junk source domain before gating', { title: item.title, url: item.canonicalUrl });
+                continue;
+              }
+
               if (!seenUrls.has(item.canonicalUrl)) {
                 seenUrls.add(item.canonicalUrl);
                 rawItems.push(item);
@@ -94,13 +106,13 @@ export class SearchRouter {
           } catch (err: any) {
             stats.providersFailed++;
             stats.failedProviderDetails.push(`${strategy}:${query} (${err.message})`);
-            logger.warn('Provider search strategy failed', { strategy, query, err: err.message });
+            logger.warn('Provider search strategy warning', { strategy, query, err: err.message });
           }
         }
       }
     }
 
-    // Apply Hard Entity Relevance Gate immediately to raw search results (Recall -> Precision)
+    // 2. Apply Hard Entity Relevance Gate
     const verifiedCandidates: NormalizedTopicItem[] = [];
     for (const item of rawItems) {
       const gateResult = EntityRelevanceGate.verifyRelevance(item, plan.targetEntity, interests);
@@ -126,21 +138,22 @@ export class SearchRouter {
     targetEntity: string
   ): Promise<NormalizedTopicItem[]> {
     switch (strategy) {
-      case 'news':
-        return this.searchGoogleNews(query, targetEntity);
       case 'github':
         return this.searchGitHub(query);
       case 'research':
         return this.searchArxiv(query);
       case 'community':
         return this.searchHackerNews(query);
+      case 'official':
+      case 'news':
       case 'general_web':
       default:
-        return this.searchDuckDuckGo(query);
+        // Use Google News RSS as the primary, reliable discovery engine
+        return this.searchGoogleNews(query);
     }
   }
 
-  private async searchGoogleNews(query: string, targetEntity: string): Promise<NormalizedTopicItem[]> {
+  private async searchGoogleNews(query: string): Promise<NormalizedTopicItem[]> {
     const encoded = encodeURIComponent(`${query} when:3d`);
     const url = `https://news.google.com/rss/search?q=${encoded}&hl=en-IN&gl=IN&ceid=IN:en`;
 
@@ -159,106 +172,77 @@ export class SearchRouter {
     const encoded = encodeURIComponent(`${query} pushed:>${yesterday}`);
     const url = `https://api.github.com/search/repositories?q=${encoded}&sort=updated&order=desc&per_page=3`;
 
-    const response = await axios.get(url, {
-      timeout: 5000,
-      headers: { 'User-Agent': 'ABTalks-Agent/1.0', Accept: 'application/vnd.github.v3+json' },
-    });
+    try {
+      const response = await axios.get(url, {
+        timeout: 4000,
+        headers: { 'User-Agent': 'ABTalks-Agent/1.0', Accept: 'application/vnd.github.v3+json' },
+      });
 
-    const items = response.data?.items || [];
-    return items.map((item: any) => ({
-      externalId: item.id.toString(),
-      canonicalUrl: canonicalizeUrl(item.html_url),
-      title: `${item.full_name}: ${item.description || 'GitHub Repository'}`,
-      sourceName: 'GitHub',
-      sourceType: 'github',
-      publishedAt: new Date(item.updated_at || item.created_at),
-      contentHash: computeHash(`${item.full_name}::${item.description}`),
-      summary: item.description || item.full_name,
-    }));
+      const items = response.data?.items || [];
+      return items.map((item: any) => ({
+        externalId: item.id.toString(),
+        canonicalUrl: canonicalizeUrl(item.html_url),
+        title: `${item.full_name}: ${item.description || 'GitHub Repository'}`,
+        sourceName: 'GitHub',
+        sourceType: 'github',
+        publishedAt: new Date(item.updated_at || item.created_at),
+        contentHash: computeHash(`${item.full_name}::${item.description}`),
+        summary: item.description || item.full_name,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   private async searchArxiv(query: string): Promise<NormalizedTopicItem[]> {
     const encoded = encodeURIComponent(query);
     const url = `http://export.arxiv.org/api/query?search_query=all:${encoded}&sortBy=submittedDate&sortOrder=descending&max_results=3`;
 
-    const response = await axios.get(url, { timeout: 5000 });
-    const xml = response.data as string;
-    const items: NormalizedTopicItem[] = [];
+    try {
+      const response = await axios.get(url, { timeout: 4000 });
+      const xml = response.data as string;
+      const items: NormalizedTopicItem[] = [];
 
-    const entryRegex = /<entry>[\s\S]*?<title>([\s\S]*?)<\/title>[\s\S]*?<id>([\s\S]*?)<\/id>[\s\S]*?<summary>([\s\S]*?)<\/summary>[\s\S]*?<published>([\s\S]*?)<\/published>[\s\S]*?<\/entry>/gi;
-    let match;
+      const entryRegex = /<entry>[\s\S]*?<title>([\s\S]*?)<\/title>[\s\S]*?<id>([\s\S]*?)<\/id>[\s\S]*?<summary>([\s\S]*?)<\/summary>[\s\S]*?<published>([\s\S]*?)<\/published>[\s\S]*?<\/entry>/gi;
+      let match;
 
-    while ((match = entryRegex.exec(xml)) !== null) {
-      const title = match[1].replace(/\s+/g, ' ').trim();
-      const rawUrl = match[2].trim();
-      const summary = match[3].replace(/\s+/g, ' ').trim();
-      const publishedDate = new Date(match[4].trim());
+      while ((match = entryRegex.exec(xml)) !== null) {
+        const title = match[1].replace(/\s+/g, ' ').trim();
+        const rawUrl = match[2].trim();
+        const summary = match[3].replace(/\s+/g, ' ').trim();
+        const publishedDate = new Date(match[4].trim());
 
-      const canonicalUrl = canonicalizeUrl(rawUrl);
-      items.push({
-        externalId: canonicalUrl,
-        canonicalUrl,
-        title: `[arXiv Research] ${title}`,
-        sourceName: 'arXiv',
-        sourceType: 'research',
-        publishedAt: isNaN(publishedDate.getTime()) ? new Date() : publishedDate,
-        contentHash: computeHash(`${title}::${summary}`),
-        summary,
-      });
+        const canonicalUrl = canonicalizeUrl(rawUrl);
+        items.push({
+          externalId: canonicalUrl,
+          canonicalUrl,
+          title: `[arXiv Research] ${title}`,
+          sourceName: 'arXiv',
+          sourceType: 'research',
+          publishedAt: isNaN(publishedDate.getTime()) ? new Date() : publishedDate,
+          contentHash: computeHash(`${title}::${summary}`),
+          summary,
+        });
+      }
+
+      return items;
+    } catch {
+      return [];
     }
-
-    return items;
   }
 
   private async searchHackerNews(query: string): Promise<NormalizedTopicItem[]> {
     const encoded = encodeURIComponent(query);
     const url = `https://hnrss.org/newest?q=${encoded}`;
-    return await this.rssDiscovery.fetchFeed({
-      id: `hn_${query.replace(/\s+/g, '_')}`,
-      name: `HackerNews: ${query}`,
-      url,
-      sourceType: 'tech_news',
-    });
-  }
-
-  private async searchDuckDuckGo(query: string): Promise<NormalizedTopicItem[]> {
-    const encoded = encodeURIComponent(query);
-    const url = `https://html.duckduckgo.com/html/?q=${encoded}&df=d`;
-
-    const response = await axios.get(url, {
-      timeout: 5000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
-    });
-
-    const html = response.data as string;
-    const items: NormalizedTopicItem[] = [];
-    const linkRegex = /<a class="result__url" href="([^"]+)".*?>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet".*?>([\s\S]*?)<\/a>/gi;
-
-    let match;
-    let count = 0;
-    while ((match = linkRegex.exec(html)) !== null && count < 5) {
-      count++;
-      let rawUrl = match[1].trim();
-      if (rawUrl.startsWith('//')) rawUrl = 'https:' + rawUrl;
-      const canonicalUrl = canonicalizeUrl(rawUrl);
-
-      const title = match[2].replace(/<[^>]+>/g, '').trim() || query;
-      const snippet = match[3].replace(/<[^>]+>/g, '').trim();
-
-      items.push({
-        externalId: canonicalUrl,
-        canonicalUrl,
-        title,
-        sourceName: 'DuckDuckGo Web',
-        sourceType: 'web',
-        publishedAt: new Date(),
-        contentHash: computeHash(`${title}::${snippet}`),
-        summary: snippet || title,
+    try {
+      return await this.rssDiscovery.fetchFeed({
+        id: `hn_${query.replace(/\s+/g, '_')}`,
+        name: `HackerNews: ${query}`,
+        url,
+        sourceType: 'tech_news',
       });
+    } catch {
+      return [];
     }
-
-    return items;
   }
 }
