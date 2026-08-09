@@ -7,6 +7,7 @@ import { DiscoveryPlan, SourceStrategy } from './discovery-plan';
 import { EntityRelevanceGate } from './entity-relevance-gate';
 import { isJunkSourceDomain } from '../editorial/source-quality';
 import { LIVE_TECH_SOURCES } from './source-registry';
+import { globalCuckooFilter } from './cuckoo-filter';
 
 export interface ProviderExecutionStats {
   providersAttempted: number;
@@ -91,7 +92,8 @@ export class SearchRouter {
         const feedItems = await this.rssDiscovery.fetchFeed(source);
         stats.providersSuccessful++;
         for (const item of feedItems) {
-          if (!isJunkSourceDomain(item.canonicalUrl, item.title) && !seenUrls.has(item.canonicalUrl)) {
+          if (!isJunkSourceDomain(item.canonicalUrl, item.title) && !globalCuckooFilter.has(item.canonicalUrl) && !seenUrls.has(item.canonicalUrl)) {
+            globalCuckooFilter.add(item.canonicalUrl);
             seenUrls.add(item.canonicalUrl);
             rawItems.push(item);
           }

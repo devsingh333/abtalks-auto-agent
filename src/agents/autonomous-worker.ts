@@ -63,12 +63,14 @@ export class AutonomousWorker {
       const discoveredCount = await this.discoveryService.runDiscoveryForAgent(agent.id);
       logger.info('Discovery stage completed', { cycleId, agentId, discoveredCount });
 
-      // Step 2: Editorial Evaluation
+      // Step 2: Parallel Concurrent Editorial Evaluation (Concurrency: 4)
       const pendingTopics = await TopicRepository.getPendingTopics(agent.id, 10);
-      logger.info('Evaluating pending topics (batch limit 10)', { cycleId, count: pendingTopics.length });
+      logger.info('Evaluating pending topics concurrently in parallel', { cycleId, count: pendingTopics.length });
 
-      for (const topic of pendingTopics) {
-        await this.editorialEngine.evaluateTopic(agent, topic);
+      const concurrency = 4;
+      for (let i = 0; i < pendingTopics.length; i += concurrency) {
+        const chunk = pendingTopics.slice(i, i + concurrency);
+        await Promise.all(chunk.map((topic) => this.editorialEngine.evaluateTopic(agent, topic)));
       }
 
       // Step 3: Publishing Safeguards & Cooldowns

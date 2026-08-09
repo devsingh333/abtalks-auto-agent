@@ -7,6 +7,7 @@ import { MemoryService } from '../memory/memory-service';
 import { geminiClient } from '../ai/gemini-client';
 import { buildEvaluateTopicPrompt, EditorialEvaluationResult } from '../ai/prompts/evaluate-topic';
 import { TopicRepository } from '../database/repositories/topic-repository';
+import { FastSemanticClassifier } from './fast-semantic-classifier';
 import { logger } from '../utils/logger';
 
 export interface FinalEditorialDecision {
@@ -31,13 +32,13 @@ export class EditorialEngine {
       persona
     );
 
-    // Fast-path rejection ONLY if deterministic score is under 3.5
-    if (detResult.totalScore < 3.5) {
-      const reason = `Insufficient baseline score (${detResult.totalScore}/10) for ${persona.domain} domain.`;
+    // Fast pre-classifier relevance check (< 0.1ms)
+    if (!FastSemanticClassifier.isPlausibleCandidate(topic, persona)) {
+      const reason = `Fast Pre-Classifier relevance score under threshold for ${persona.domain} domain.`;
       await TopicRepository.updateStatus(topic.id, 'rejected', detResult.totalScore);
-      await TopicRepository.recordDecision(topic.id, 'reject', detResult.breakdown, reason, 'rule-deterministic-filter');
+      await TopicRepository.recordDecision(topic.id, 'reject', detResult.breakdown, reason, 'rule-fast-classifier');
 
-      logger.info('Topic rejected by baseline scorer', { agentId: agent.id, topicId: topic.id, title: topic.title, score: detResult.totalScore });
+      logger.info('Topic rejected by fast semantic classifier', { agentId: agent.id, topicId: topic.id, title: topic.title });
       return { topicId: topic.id, decision: 'reject', score: detResult.totalScore, reason };
     }
 
