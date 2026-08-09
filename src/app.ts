@@ -6,14 +6,23 @@ import { logger } from './utils/logger';
 import { handleInitAgent } from './api/agent-init.route';
 import { handleGetAgentFeed } from './api/agent-feed.route';
 import { handleHealth } from './api/health.route';
-import { handleMonitorOverview, handleAgentDetails, handleMonitorActivity, handleMonitorPosts, handleAgentPause, handleAgentResume, handleAgentDelete, handleAgentTriggerCycle } from './api/monitor.route';
+import {
+  handleMonitorOverview,
+  handleAgentDetails,
+  handleMonitorActivity,
+  handleMonitorPosts,
+  handleAgentPause,
+  handleAgentResume,
+  handleAgentDelete,
+  handleAgentTriggerCycle,
+} from './api/monitor.route';
 
 export const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// Endpoint Development Logging Middleware (Active when NODE_ENV !== 'production')
+// Endpoint Development Logging Middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
   const startTime = Date.now();
 
@@ -34,12 +43,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Serve dashboard static files on root / and /monitor
-app.use(express.static(path.join(__dirname, '..', 'monitor')));
-app.use('/monitor', express.static(path.join(__dirname, '..', 'monitor')));
-
-// Routes
-app.post('/api/agent/init', handleInitAgent);
+// Primary API Routes (Mount API routes BEFORE static files)
+app.all('/api/agent/init', handleInitAgent);
 app.get('/api/agent/feed', handleGetAgentFeed);
 app.get('/health', handleHealth);
 
@@ -53,7 +58,11 @@ app.post('/api/monitor/agent/:id/resume', handleAgentResume);
 app.delete('/api/monitor/agent/:id', handleAgentDelete);
 app.post('/api/monitor/agent/:id/trigger', handleAgentTriggerCycle);
 
+// Serve dashboard static files on root / and /monitor
+app.use(express.static(path.join(__dirname, '..', 'monitor')));
+app.use('/monitor', express.static(path.join(__dirname, '..', 'monitor')));
+
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+  res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
 });

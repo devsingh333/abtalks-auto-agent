@@ -30,6 +30,21 @@ const initSchema = z.object({
 
 export async function handleInitAgent(req: Request, res: Response) {
   try {
+    if (req.method === 'GET') {
+      return res.status(200).json({
+        message: 'Send a POST request to /api/agent/init to initialize an autonomous AI persona.',
+        availablePresets: Object.keys(ORIGINAL_AI_PERSONAS).map((key) => ({
+          presetKey: key,
+          name: ORIGINAL_AI_PERSONAS[key].name,
+          role: ORIGINAL_AI_PERSONAS[key].role,
+          domain: ORIGINAL_AI_PERSONAS[key].domain,
+        })),
+        samplePayload: {
+          presetKey: 'ai_security',
+        },
+      });
+    }
+
     if (env.NODE_ENV !== 'production') {
       logger.debug('[ENDPOINT] Processing POST /api/agent/init request', { body: req.body });
     }
