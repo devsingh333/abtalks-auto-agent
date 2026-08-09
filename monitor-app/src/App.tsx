@@ -63,6 +63,14 @@ interface PersonaConfig {
   };
 }
 
+interface WorkerSchedule {
+  intervalMinutes: number;
+  status: 'active' | 'paused';
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  isRunning: boolean;
+}
+
 interface Agent {
   id: string;
   name: string;
@@ -70,6 +78,7 @@ interface Agent {
   status: 'active' | 'paused';
   createdAt: string;
   personaConfig?: string;
+  schedule?: WorkerSchedule;
   stats: AgentStats;
 }
 
@@ -186,6 +195,57 @@ function OrbixLogo({ className = 'w-5 h-5' }: { className?: string }) {
         <path d="M12 3v3M12 18v3M3 12h3M18 12h3" strokeLinecap="round" className="text-indigo-400" />
       </svg>
     </div>
+  );
+}
+
+/** Live Countdown Timer Component for Agent Cycles */
+function WorkerCountdownTimer({ schedule }: { schedule?: WorkerSchedule }) {
+  const [now, setNow] = useState<number>(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  if (!schedule || schedule.status === 'paused') {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-950/60 border border-white/[0.04] text-[10px] font-mono text-zinc-500">
+        <Clock className="w-3 h-3 text-zinc-600" />
+        <span>Loop Paused</span>
+      </span>
+    );
+  }
+
+  if (schedule.isRunning) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono text-[10px] font-semibold border border-amber-500/30 shadow-sm">
+        <Zap className="w-3 h-3 text-amber-400 animate-pulse fill-amber-400/40" />
+        <span>Executing Cycle...</span>
+      </span>
+    );
+  }
+
+  if (!schedule.nextRunAt) {
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-950 border border-white/[0.06] text-[10px] font-mono text-indigo-300">
+        <Clock className="w-3 h-3 text-indigo-400 animate-pulse" />
+        <span>Next Cycle in 5m 00s</span>
+      </span>
+    );
+  }
+
+  const targetTime = new Date(schedule.nextRunAt).getTime();
+  const diffMs = Math.max(0, targetTime - now);
+  const totalSec = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  const formattedSec = seconds < 10 ? `0${seconds}` : `${seconds}`;
+
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-950 border border-white/[0.08] text-[10px] font-mono text-indigo-300 shadow-sm">
+      <Clock className="w-3 h-3 text-indigo-400 animate-pulse" />
+      <span>Next Cycle in <strong className="text-zinc-100 font-semibold">{minutes}m {formattedSec}s</strong></span>
+    </span>
   );
 }
 
@@ -741,6 +801,11 @@ export default function App() {
                                 {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                                 <span>{isCopied ? 'Copied' : 'Copy'}</span>
                               </button>
+                            </div>
+
+                            {/* Live 5-Min Worker Countdown Timer Badge */}
+                            <div className="pt-1 flex items-center justify-between">
+                              <WorkerCountdownTimer schedule={agent.schedule} />
                             </div>
 
                             {/* Pipeline Metrics */}

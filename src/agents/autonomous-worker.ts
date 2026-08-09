@@ -1,5 +1,6 @@
 import { AgentRepository } from '../database/repositories/agent-repository';
 import { TopicRepository } from '../database/repositories/topic-repository';
+import { PostRepository } from '../database/repositories/post-repository';
 import { DiscoveryService } from '../discovery/discovery-service';
 import { EditorialEngine } from '../editorial/editorial-engine';
 import { PostService } from '../publishing/post-service';
@@ -9,12 +10,45 @@ import { prisma } from '../database/client';
 import { geminiClient } from '../ai/gemini-client';
 import { buildCompareEventSimilarityPrompt, EventSimilarityResult } from '../ai/prompts/compare-event-similarity';
 
+export interface AgentWorkerSchedule {
+  intervalMinutes: number;
+  status: 'active' | 'paused';
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  isRunning: boolean;
+}
+
 export class AutonomousWorker {
   private discoveryService = new DiscoveryService();
   private editorialEngine = new EditorialEngine();
   private postService = new PostService();
   private activeWorkers = new Set<string>();
   private intervals = new Map<string, NodeJS.Timeout>();
+  private scheduleMap = new Map<string, { lastRunAt: string; nextRunAt: string; isRunning: boolean }>();
+
+  getWorkerSchedule(agentId: string): AgentWorkerSchedule {
+    const sched = this.scheduleMap.get(agentId);
+    const isActive = this.activeWorkers.has(agentId);
+    const intervalMinutes = Math.max(1, env.AGENT_DISCOVERY_INTERVAL_MINUTES);
+
+    if (!sched) {
+      return {
+        intervalMinutes,
+        status: isActive ? 'active' : 'paused',
+        lastRunAt: null,
+        nextRunAt: null,
+        isRunning: false,
+      };
+    }
+
+    return {
+      intervalMinutes,
+      status: isActive ? 'active' : 'paused',
+      lastRunAt: sched.lastRunAt,
+      nextRunAt: sched.nextRunAt,
+      isRunning: sched.isRunning,
+    };
+  }
 
   startWorkerForAgent(agentId: string) {
     if (this.activeWorkers.has(agentId)) {
@@ -22,7 +56,17 @@ export class AutonomousWorker {
       return;
     }
 
+    const intervalMs = Math.max(1, env.AGENT_DISCOVERY_INTERVAL_MINUTES) * 60 * 1000;
+    const now = new Date();
+    const nextRun = new Date(now.getTime() + intervalMs);
+
     this.activeWorkers.add(agentId);
+    this.scheduleMap.set(agentId, {
+      lastRunAt: now.toISOString(),
+      nextRunAt: nextRun.toISOString(),
+      isRunning: false,
+    });
+
     logger.info('Starting autonomous worker loop for agent', { agentId });
 
     // Initial immediate execution cycle
@@ -31,8 +75,17 @@ export class AutonomousWorker {
     });
 
     // Schedule recurring discovery & publishing loops
-    const intervalMs = Math.max(1, env.AGENT_DISCOVERY_INTERVAL_MINUTES) * 60 * 1000;
     const timer = setInterval(() => {
+      const cycleNow = new Date();
+      const cycleNext = new Date(cycleNow.getTime() + intervalMs);
+
+      const existing = this.scheduleMap.get(agentId);
+      this.scheduleMap.set(agentId, {
+        lastRunAt: cycleNow.toISOString(),
+        nextRunAt: cycleNext.toISOString(),
+        isRunning: existing?.isRunning || false,
+      });
+
       this.executeCycle(agentId).catch((err) => {
         logger.error('Error in recurring autonomous worker cycle', { agentId }, err);
       });
@@ -47,6 +100,10 @@ export class AutonomousWorker {
     if (timer) {
       clearInterval(timer);
       this.intervals.delete(agentId);
+    }
+    const sched = this.scheduleMap.get(agentId);
+    if (sched) {
+      this.scheduleMap.set(agentId, { ...sched, isRunning: false });
     }
     logger.info('Stopped autonomous worker loop for agent', { agentId });
   }
@@ -80,6 +137,16 @@ export class AutonomousWorker {
 
   async executeCycle(agentId: string) {
     const cycleId = `cycle_${Date.now()}`;
+    const existingSched = this.scheduleMap.get(agentId);
+    const intervalMs = Math.max(1, env.AGENT_DISCOVERY_INTERVAL_MINUTES) * 60 * 1000;
+    const now = new Date();
+
+    this.scheduleMap.set(agentId, {
+      lastRunAt: existingSched?.lastRunAt || now.toISOString(),
+      nextRunAt: existingSched?.nextRunAt || new Date(now.getTime() + intervalMs).toISOString(),
+      isRunning: true,
+    });
+
     logger.info('Autonomous cycle started', { cycleId, agentId });
 
     try {
@@ -98,125 +165,99 @@ export class AutonomousWorker {
 
       // Step 2: Parallel Concurrent Editorial Evaluation (Concurrency: 4)
       const pendingTopics = await TopicRepository.getPendingTopics(agent.id, 10);
-      logger.info('Evaluating pending topics concurrently in parallel', { cycleId, count: pendingTopics.length });
+      if (pendingTopics.length > 0) {
+        logger.info('Evaluating pending topics concurrently in parallel', { count: pendingTopics.length });
 
-      const concurrency = 4;
-      for (let i = 0; i < pendingTopics.length; i += concurrency) {
-        const chunk = pendingTopics.slice(i, i + concurrency);
-        await Promise.all(chunk.map((topic) => this.editorialEngine.evaluateTopic(agent, topic)));
-      }
-
-      // Step 3: Publishing Safeguards & Cooldowns
-      const canPublish = await this.checkPublishingCooldown(agent.id);
-      if (canPublish) {
-        let approved = await TopicRepository.getSelectedTopics(agent.id);
-
-        if (approved.length === 0) {
-          const calibrated = await this.editorialEngine.calibrateSecondPass(agent);
-          if (calibrated) {
-            approved = await TopicRepository.getSelectedTopics(agent.id);
-          }
-        }
-
-        if (approved.length > 0) {
-          approved.sort((a, b) => (b.score || 0) - (a.score || 0));
-
-          // Fetch recent published posts for Final AI Anti-Collision Check
-          const recentPosts = await prisma.post.findMany({
-            where: { agentId: agent.id },
-            orderBy: { createdAt: 'desc' },
-            take: 20,
-            include: { topic: true },
-          });
-
-          const recentTitles = recentPosts.map((p) => p.topic?.title || p.text).filter(Boolean);
-
-          for (const targetTopic of approved) {
-            // Final AI Anti-Collision Gate: Verify topic title is not duplicate of recent published posts
-            if (recentTitles.length > 0) {
-              const prompt = buildCompareEventSimilarityPrompt(targetTopic.title, recentTitles);
-              const check = await geminiClient.generateStructuredJson<EventSimilarityResult>(
-                prompt,
-                () => ({ isDuplicate: false, reason: 'Fallback default: proceed' }),
-                agent.id
-              );
-
-              if (check.isDuplicate) {
-                logger.warn('AI Final Anti-Collision Gate rejected duplicate topic before publishing', {
-                  agentId: agent.id,
-                  candidateTitle: targetTopic.title,
-                  duplicateOf: check.duplicateOfTitle,
-                  reason: check.reason,
-                });
-
-                await TopicRepository.updateStatus(targetTopic.id, 'rejected');
-                await TopicRepository.recordDecision(
-                  targetTopic.id,
-                  'reject',
-                  { score: targetTopic.score || 0 },
-                  `AI Final Anti-Collision Gate: Duplicate event already published ("${check.duplicateOfTitle || 'Recent Story'}")`,
-                  'ai-final-anti-collision-gate'
-                );
-
-                continue; // Evaluate next approved topic in queue
+        const batchSize = 4;
+        for (let i = 0; i < pendingTopics.length; i += batchSize) {
+          const chunk = pendingTopics.slice(i, i + batchSize);
+          await Promise.all(
+            chunk.map(async (topic) => {
+              try {
+                await this.editorialEngine.evaluateTopic(agent, topic);
+              } catch (err) {
+                logger.error('Error in parallel topic evaluation', { agentId, topicId: topic.id }, err);
               }
-            }
-
-            // Target topic passed Final AI Anti-Collision Gate! Publish it now.
-            logger.info('Publishing top selected topic for agent after passing AI Final Gate', {
-              agentId: agent.id,
-              topicId: targetTopic.id,
-              title: targetTopic.title,
-              score: targetTopic.score,
-            });
-
-            const decisionReason = `Selected topic with editorial score ${targetTopic.score}`;
-            const publishedPost = await this.postService.generateAndPublishPost(agent, targetTopic, decisionReason);
-            if (publishedPost) break; // Successfully published
-          }
-        } else {
-          logger.info('No approved topics selected for publishing in this cycle', { cycleId, agentId });
+            })
+          );
         }
-      } else {
-        logger.info('Publishing skipped due to active cooldown or max daily post limits', { cycleId, agentId });
       }
 
-      // Final Check: If published post count was 0 at start and we now have approved topics, publish immediately
-      await this.triggerInstantPublishIfZeroPosts(agent.id);
+      // Step 3: Publish Top Approved Selected Topic
+      let selectedTopics = await TopicRepository.getSelectedTopics(agent.id);
 
-      logger.info('Autonomous cycle completed successfully', { cycleId, agentId });
+      // Autonomous Second-Pass Safeguard: If zero topics passed minimum threshold, select highest scoring discovered topic
+      if (selectedTopics.length === 0) {
+        logger.warn('Zero topics passed editorial threshold in cycle; invoking autonomous fallback review', { agentId });
+        const topEvaluated = await prisma.topic.findFirst({
+          where: { agentId: agent.id, status: 'rejected', score: { gte: 5.0 } },
+          orderBy: { score: 'desc' },
+        });
+
+        if (topEvaluated) {
+          logger.info('Safeguard selected top rejected topic for publication', { topicId: topEvaluated.id, score: topEvaluated.score });
+          await TopicRepository.updateStatus(topEvaluated.id, 'selected');
+          selectedTopics = [topEvaluated];
+        }
+      }
+
+      if (selectedTopics.length > 0) {
+        selectedTopics.sort((a, b) => (b.score || 0) - (a.score || 0));
+        const targetTopic = selectedTopics[0];
+
+        // Step 3.1: Final AI Anti-Collision Gate against recent 20 published posts
+        const recentPosts = await PostRepository.getPostsByAgent(agent.id, 20);
+        let passesAntiCollision = true;
+
+        if (recentPosts.length > 0) {
+          const recentTitles = recentPosts.map((p: any) => p.topic?.title || p.text.substring(0, 80));
+          const prompt = buildCompareEventSimilarityPrompt(targetTopic.title, recentTitles);
+
+          const similarityCheck = await geminiClient.generateStructuredJson<EventSimilarityResult>(
+            prompt,
+            () => ({ isDuplicate: false, similarityScore: 0, matchedTitle: null, reason: 'Fallback pass' }),
+            agent.id
+          );
+
+          if (similarityCheck.isDuplicate) {
+            logger.warn('Final AI Anti-Collision Gate flagged duplicate event, rejecting topic', {
+              topicId: targetTopic.id,
+              duplicateOfTitle: similarityCheck.duplicateOfTitle,
+              reasoning: similarityCheck.reason,
+            });
+            await TopicRepository.updateStatus(targetTopic.id, 'rejected');
+            passesAntiCollision = false;
+          }
+        }
+
+        if (passesAntiCollision) {
+          const decisionReason = `Selected highest scoring topic (Score: ${targetTopic.score?.toFixed(1) || 'N/A'}) matching persona requirements.`;
+          await this.postService.generateAndPublishPost(agent, targetTopic, decisionReason);
+        }
+      }
+
+      logger.info('Autonomous worker cycle completed successfully', { cycleId, agentId });
     } catch (err) {
-      logger.error('Error in autonomous worker cycle execution', { cycleId, agentId }, err);
+      logger.error('Unhandled error during autonomous worker cycle', { cycleId, agentId }, err);
+    } finally {
+      const endSched = this.scheduleMap.get(agentId);
+      if (endSched) {
+        this.scheduleMap.set(agentId, { ...endSched, isRunning: false });
+      }
     }
   }
 
-  private async checkPublishingCooldown(agentId: string): Promise<boolean> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  async restoreActiveWorkers() {
+    try {
+      const activeAgents = await AgentRepository.listActiveAgents();
+      logger.info(`Restoring autonomous background workers for ${activeAgents.length} active agent(s)`);
 
-    const postsTodayCount = await prisma.post.count({
-      where: {
-        agentId,
-        createdAt: { gte: today },
-      },
-    });
-
-    if (postsTodayCount >= env.AGENT_MAX_POSTS_PER_DAY) {
-      logger.info('Max daily post limit reached', { count: postsTodayCount, max: env.AGENT_MAX_POSTS_PER_DAY });
-      return false;
+      for (const agent of activeAgents) {
+        this.startWorkerForAgent(agent.id);
+      }
+    } catch (err) {
+      logger.error('Failed to restore active agent workers on server startup', {}, err);
     }
-
-    const lastPost = await prisma.post.findFirst({
-      where: { agentId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (!lastPost) return true; // Zero published posts = Instant Cooldown Pass
-
-    const diffMs = Date.now() - lastPost.createdAt.getTime();
-    const diffMinutes = diffMs / (1000 * 60);
-
-    return diffMinutes >= env.AGENT_MIN_PUBLISH_INTERVAL_MINUTES;
   }
 }
 

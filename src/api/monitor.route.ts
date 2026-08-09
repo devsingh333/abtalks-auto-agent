@@ -44,6 +44,8 @@ export async function handleMonitorOverview(_req: Request, res: Response) {
           persona = JSON.parse(agent.personaConfig);
         } catch (e) {}
 
+        const schedule = autonomousWorker.getWorkerSchedule(agent.id);
+
         return {
           id: agent.id,
           name: (persona as any).name || agent.name,
@@ -51,6 +53,7 @@ export async function handleMonitorOverview(_req: Request, res: Response) {
           status: agent.status,
           createdAt: agent.createdAt.toISOString(),
           personaConfig: agent.personaConfig,
+          schedule,
           stats: {
             totalTopicsDiscovered,
             topicsPending,
