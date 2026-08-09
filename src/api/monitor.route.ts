@@ -109,6 +109,15 @@ export async function handleAgentDetails(req: Request, res: Response) {
       persona = JSON.parse(agent.personaConfig);
     } catch (e) {}
 
+    // Find highest-scoring approved topic queued as next up for publication
+    const nextUpTopic = await prisma.topic.findFirst({
+      where: {
+        agentId: id,
+        status: 'selected',
+      },
+      orderBy: { score: 'desc' },
+    });
+
     return res.status(200).json({
       agent: {
         id: agent.id,
@@ -118,6 +127,15 @@ export async function handleAgentDetails(req: Request, res: Response) {
         createdAt: agent.createdAt.toISOString(),
         persona,
       },
+      nextUpTopic: nextUpTopic
+        ? {
+            id: nextUpTopic.id,
+            title: nextUpTopic.title,
+            score: nextUpTopic.score,
+            canonicalUrl: nextUpTopic.canonicalUrl,
+            createdAt: nextUpTopic.createdAt.toISOString(),
+          }
+        : null,
       pendingQueue: pendingQueue.map((t) => ({
         id: t.id,
         title: t.title,

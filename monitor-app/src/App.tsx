@@ -80,6 +80,13 @@ interface AgentDeepDetails {
     createdAt: string;
     persona: PersonaConfig;
   };
+  nextUpTopic?: {
+    id: string;
+    title: string;
+    score: number | null;
+    canonicalUrl: string;
+    createdAt: string;
+  } | null;
   pendingQueue: Array<{
     id: string;
     title: string;
@@ -924,6 +931,45 @@ export default function App() {
                     <Zap className="w-3.5 h-3.5 text-amber-400" />
                     <span>Run Immediate Cycle</span>
                   </button>
+                </div>
+
+                {/* Next Approved Topic to be Published Callout */}
+                <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20 space-y-2">
+                  <div className="flex items-center justify-between font-mono text-xs text-emerald-400">
+                    <span className="flex items-center gap-1.5 font-semibold">
+                      <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      <span>NEXT APPROVED TOPIC TO BE PUBLISHED</span>
+                    </span>
+                    {deepAgentDetails.nextUpTopic?.score !== undefined && deepAgentDetails.nextUpTopic?.score !== null && (
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold">
+                        Score: {deepAgentDetails.nextUpTopic.score.toFixed(1)} / 10
+                      </span>
+                    )}
+                  </div>
+
+                  {deepAgentDetails.nextUpTopic ? (
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-xs sm:text-sm text-zinc-100">{deepAgentDetails.nextUpTopic.title}</h4>
+                      <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400 pt-1 border-t border-white/[0.04]">
+                        <span>Status: Queued & Approved for Next Publication</span>
+                        {deepAgentDetails.nextUpTopic.canonicalUrl && (
+                          <a
+                            href={deepAgentDetails.nextUpTopic.canonicalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                          >
+                            <span>Publisher Source</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-400 font-mono">
+                      No approved topics queued yet — next autonomous discovery cycle will evaluate candidate stories and select the top story for publication.
+                    </p>
+                  )}
                 </div>
 
                 {/* Persona Profile Summary */}

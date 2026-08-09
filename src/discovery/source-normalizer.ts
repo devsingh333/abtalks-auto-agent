@@ -8,6 +8,7 @@ export interface RawFeedItem {
   isoDate?: string;
   contentSnippet?: string;
   summary?: string;
+  source?: any;
 }
 
 export interface NormalizedTopicItem {
@@ -22,12 +23,35 @@ export interface NormalizedTopicItem {
 }
 
 export class SourceNormalizer {
-  static normalizeItem(item: RawFeedItem, sourceName: string, sourceType: string): NormalizedTopicItem | null {
-    const rawUrl = item.link || item.guid;
+  static normalizeItem(item: RawFeedItem, defaultSourceName: string, sourceType: string): NormalizedTopicItem | null {
+    let rawUrl = item.link || item.guid;
     const title = item.title?.trim();
 
     if (!rawUrl || !title) {
       return null;
+    }
+
+    let sourceName = defaultSourceName;
+
+    // Google News & RSS <source url="https://www.gsmarena.com">GSMArena.com</source> extraction
+    if (item.source) {
+      let publisherUrl: string | undefined;
+      let publisherName: string | undefined;
+
+      if (typeof item.source === 'object') {
+        publisherUrl = item.source.$?.url || item.source.url;
+        publisherName = item.source._ || item.source.title || item.source.name;
+      } else if (typeof item.source === 'string') {
+        publisherName = item.source;
+      }
+
+      if (publisherUrl && (rawUrl.includes('news.google.com') || rawUrl.includes('rss'))) {
+        rawUrl = publisherUrl;
+      }
+
+      if (publisherName) {
+        sourceName = `${defaultSourceName} (${publisherName})`;
+      }
     }
 
     const canonicalUrl = canonicalizeUrl(rawUrl);
