@@ -46,6 +46,12 @@ export async function handleMonitorOverview(_req: Request, res: Response) {
 
         const schedule = autonomousWorker.getWorkerSchedule(agent.id);
 
+        const nextUpTopic = await prisma.topic.findFirst({
+          where: { agentId: agent.id, status: 'selected' },
+          orderBy: { score: 'desc' },
+          select: { title: true },
+        });
+
         return {
           id: agent.id,
           name: (persona as any).name || agent.name,
@@ -54,6 +60,7 @@ export async function handleMonitorOverview(_req: Request, res: Response) {
           createdAt: agent.createdAt.toISOString(),
           personaConfig: agent.personaConfig,
           schedule,
+          nextUpTopicTitle: nextUpTopic?.title || null,
           stats: {
             totalTopicsDiscovered,
             topicsPending,

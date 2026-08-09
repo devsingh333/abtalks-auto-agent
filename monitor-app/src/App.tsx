@@ -79,6 +79,7 @@ interface Agent {
   createdAt: string;
   personaConfig?: string;
   schedule?: WorkerSchedule;
+  nextUpTopicTitle?: string | null;
   stats: AgentStats;
 }
 
@@ -198,8 +199,8 @@ function OrbixLogo({ className = 'w-5 h-5' }: { className?: string }) {
   );
 }
 
-/** Live Countdown Timer Component for Agent Cycles */
-function WorkerCountdownTimer({ schedule }: { schedule?: WorkerSchedule }) {
+/** Live Countdown Timer Component for Next Article Publishing */
+function WorkerCountdownTimer({ schedule, nextUpTitle }: { schedule?: WorkerSchedule; nextUpTitle?: string | null }) {
   const [now, setNow] = useState<number>(Date.now());
 
   useEffect(() => {
@@ -209,27 +210,27 @@ function WorkerCountdownTimer({ schedule }: { schedule?: WorkerSchedule }) {
 
   if (!schedule || schedule.status === 'paused') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-950/60 border border-white/[0.04] text-[10px] font-mono text-zinc-500">
-        <Clock className="w-3 h-3 text-zinc-600" />
-        <span>Loop Paused</span>
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-zinc-950/60 border border-white/[0.04] text-[10px] font-mono text-zinc-500">
+        <Clock className="w-3.5 h-3.5 text-zinc-600" />
+        <span>Publishing Loop Paused</span>
       </span>
     );
   }
 
   if (schedule.isRunning) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono text-[10px] font-semibold border border-amber-500/30 shadow-sm">
-        <Zap className="w-3 h-3 text-amber-400 animate-pulse fill-amber-400/40" />
-        <span>Executing Cycle...</span>
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-500/20 text-emerald-300 font-mono text-[11px] font-semibold border border-emerald-500/30 shadow-sm animate-pulse">
+        <Zap className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/40" />
+        <span>Publishing Article & Generating Output...</span>
       </span>
     );
   }
 
   if (!schedule.nextRunAt) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-950 border border-white/[0.06] text-[10px] font-mono text-indigo-300">
-        <Clock className="w-3 h-3 text-indigo-400 animate-pulse" />
-        <span>Next Cycle in 5m 00s</span>
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-950 border border-white/[0.08] text-[11px] font-mono text-indigo-300">
+        <Clock className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+        <span>Next Article Publish in <strong className="text-zinc-100 font-semibold">5m 00s</strong></span>
       </span>
     );
   }
@@ -242,10 +243,17 @@ function WorkerCountdownTimer({ schedule }: { schedule?: WorkerSchedule }) {
   const formattedSec = seconds < 10 ? `0${seconds}` : `${seconds}`;
 
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-zinc-950 border border-white/[0.08] text-[10px] font-mono text-indigo-300 shadow-sm">
-      <Clock className="w-3 h-3 text-indigo-400 animate-pulse" />
-      <span>Next Cycle in <strong className="text-zinc-100 font-semibold">{minutes}m {formattedSec}s</strong></span>
-    </span>
+    <div className="space-y-1">
+      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-950 border border-indigo-500/30 text-[11px] font-mono text-indigo-300 shadow-sm">
+        <Clock className="w-3.5 h-3.5 text-indigo-400 animate-pulse shrink-0" />
+        <span>Next Article Publish in <strong className="text-emerald-400 font-bold">{minutes}m {formattedSec}s</strong></span>
+      </div>
+      {nextUpTitle && (
+        <span className="text-[10px] text-zinc-400 font-mono block truncate max-w-xs pl-0.5" title={nextUpTitle}>
+          Approved Article Queued: <strong className="text-zinc-200">{nextUpTitle}</strong>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -803,9 +811,9 @@ export default function App() {
                               </button>
                             </div>
 
-                            {/* Live 5-Min Worker Countdown Timer Badge */}
-                            <div className="pt-1 flex items-center justify-between">
-                              <WorkerCountdownTimer schedule={agent.schedule} />
+                            {/* Live Article Publishing Countdown Timer Badge */}
+                            <div className="pt-1">
+                              <WorkerCountdownTimer schedule={agent.schedule} nextUpTitle={agent.nextUpTopicTitle} />
                             </div>
 
                             {/* Pipeline Metrics */}
