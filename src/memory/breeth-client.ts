@@ -74,7 +74,7 @@ export class BreethClient {
           
           // Handle response format from Breeth knowledge graph / vector search
           if (Array.isArray(response.data.edges) && response.data.edges.length > 0) {
-            for (const edge of response.data.edges.slice(0, limit)) {
+            for (const edge of (response.data.edges || []).slice(0, limit)) {
               memories.push({
                 id: `edge_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
                 agentId,
@@ -102,7 +102,7 @@ export class BreethClient {
     );
 
     // If query filter returns empty, return most recent memories
-    return (matches.length > 0 ? matches : all).slice(-limit);
+    return ((matches.length > 0 ? matches : all) || []).slice(-limit);
   }
 
   async purgeAgentMemory(agentId: string): Promise<void> {

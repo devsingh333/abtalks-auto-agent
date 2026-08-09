@@ -43,7 +43,7 @@ export class EventClusterer {
         }
       } else {
         clusters.push({
-          id: `event_${item.contentHash.slice(0, 12)}`,
+          id: `event_${(item.contentHash || '').slice(0, 12)}`,
           primaryTitle: item.title,
           summary: item.title,
           canonicalUrls: [item.canonicalUrl],

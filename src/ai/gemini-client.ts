@@ -36,7 +36,7 @@ function parseModelJsonResponse<T>(rawContent: string): T {
     }
   }
 
-  throw new Error(`Failed to parse valid JSON from AI response: ${rawContent.slice(0, 100)}...`);
+  throw new Error(`Failed to parse valid JSON from AI response: ${(rawContent || '').slice(0, 100)}...`);
 }
 
 function detectPurpose(prompt: string): string {

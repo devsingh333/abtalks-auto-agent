@@ -105,9 +105,12 @@ export class SearchRouter {
     }
 
     // 2. Execute intent-routed search queries
-    for (const intent of plan.intents) {
-      for (const query of intent.queries.slice(0, 2)) {
-        for (const strategy of intent.sourceStrategy) {
+    const intents = Array.isArray(plan?.intents) ? plan.intents : [];
+    for (const intent of intents) {
+      const queries = Array.isArray(intent?.queries) ? intent.queries : [];
+      for (const query of queries.slice(0, 2)) {
+        const strategies = Array.isArray(intent?.sourceStrategy) ? intent.sourceStrategy : [];
+        for (const strategy of strategies) {
           stats.providersAttempted++;
           try {
             const items = await this.executeStrategyQuery(query, strategy, plan.targetEntity);

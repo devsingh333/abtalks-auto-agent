@@ -11,12 +11,13 @@ export class WebSearchFetcher {
    * Searches live web, news, GitHub, arXiv, and RSS sources dynamically across 5 providers for a given set of queries.
    * Only returns items published/updated in the last 24 hours.
    */
-  async searchAndExtract(queries: string[]): Promise<NormalizedTopicItem[]> {
+  async searchAndExtract(queries: string[] = []): Promise<NormalizedTopicItem[]> {
     const results: NormalizedTopicItem[] = [];
     const seenUrls = new Set<string>();
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const safeQueries = Array.isArray(queries) ? queries : [];
 
-    for (const query of queries.slice(0, 2)) {
+    for (const query of safeQueries.slice(0, 2)) {
       try {
         const queryResults = await this.searchMultiProvider(query);
         for (const item of queryResults) {
@@ -36,11 +37,11 @@ export class WebSearchFetcher {
     }
 
     logger.info('Live 24h freshness discovery completed', {
-      queryCount: queries.length,
+      queryCount: safeQueries.length,
       extractedFreshTotal: results.length,
     });
 
-    return results.slice(0, 10);
+    return (results || []).slice(0, 10);
   }
 
   private async searchMultiProvider(query: string): Promise<NormalizedTopicItem[]> {

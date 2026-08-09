@@ -48,7 +48,7 @@ export class EntityRelevanceGate {
 
     return {
       passed: true,
-      reason: `Matched target entity keywords: ${matchedEntities.slice(0, 3).join(', ')}`,
+      reason: `Matched target entity keywords: ${(matchedEntities || []).slice(0, 3).join(', ')}`,
       matchedEntities,
     };
   }
