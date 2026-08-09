@@ -82,13 +82,6 @@ interface Toast {
   type: 'info' | 'success' | 'error';
 }
 
-const AGENT_BADGE_COLORS = [
-  { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-400', dot: 'bg-indigo-400' },
-  { bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400', dot: 'bg-emerald-400' },
-  { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', dot: 'bg-amber-400' },
-  { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400', dot: 'bg-cyan-400' },
-];
-
 export default function App() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
@@ -97,7 +90,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activityFilter, setActivityFilter] = useState<'all' | 'post_published' | 'topic_selected' | 'topic_rejected'>('all');
+  const [activityFilter, setActivityFilter] = useState<'all' | 'topic_selected' | 'topic_rejected'>('all');
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
@@ -240,67 +233,55 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans selection:bg-zinc-800">
-      {/* Toast Notifications */}
+    <div className="min-h-screen bg-[#08080a] text-zinc-200 font-sans selection:bg-zinc-800">
+      {/* Toasts */}
       <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`pointer-events-auto px-4 py-2.5 rounded-lg text-xs font-medium border shadow-lg transition-all animate-fade-in ${
-              toast.type === 'error'
-                ? 'bg-red-950/90 border-red-800 text-red-200'
-                : toast.type === 'success'
-                ? 'bg-zinc-900 border-zinc-700 text-emerald-400'
-                : 'bg-zinc-900 border-zinc-700 text-zinc-200'
-            }`}
+            className="pointer-events-auto px-3.5 py-2 rounded-md text-xs font-medium bg-zinc-900 border border-zinc-800 shadow-lg text-zinc-200"
           >
             {toast.message}
           </div>
         ))}
       </div>
 
-      {/* Clean Developer Header */}
-      <header className="sticky top-0 z-40 border-b border-zinc-800 bg-[#09090b]/90 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      {/* Clean Glassy Header */}
+      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#08080a]/80 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-100 font-semibold text-sm">
-              AB
+            <div className="w-7 h-7 rounded bg-zinc-900 border border-white/[0.08] flex items-center justify-center text-zinc-100 font-bold text-xs">
+              OA
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-semibold text-sm tracking-tight text-zinc-100">
-                  ABTalks Agent Operations
-                </h1>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-800 border border-zinc-700 text-zinc-300">
-                  Nemotron 550B
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-[11px] text-zinc-400 mt-0.5">
-                <span className="flex items-center gap-1.5 font-medium text-emerald-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live (5s)
-                </span>
-                <span>•</span>
-                <span className="font-mono text-zinc-500">Updated {lastUpdated.toLocaleTimeString()}</span>
-              </div>
+            <div className="flex items-center gap-3">
+              <h1 className="font-semibold text-xs tracking-tight text-zinc-100">
+                Orbix Agent
+              </h1>
+              <span className="text-[11px] text-zinc-500 font-mono">
+                Nemotron 550B
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Live Sync (5s)
+              </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input
                 type="text"
-                placeholder="Search topics, agents, posts..."
+                placeholder="Search topics, agents..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors w-48 sm:w-64 placeholder:text-zinc-600"
+                className="bg-zinc-900/60 border border-white/[0.06] rounded-md pl-8 pr-3 py-1 text-xs text-zinc-200 focus:outline-none focus:border-zinc-700 transition-colors w-44 sm:w-60 placeholder:text-zinc-600"
               />
             </div>
 
             <button
               onClick={fetchData}
-              className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+              className="p-1 rounded-md bg-zinc-900 border border-white/[0.06] hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
               title="Refresh Data Now"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-zinc-200' : ''}`} />
@@ -310,230 +291,173 @@ export default function App() {
       </header>
 
       {/* Main Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
         {/* Error Alert */}
         {error && (
-          <div className="p-4 rounded-lg bg-red-950/40 border border-red-900/60 flex items-center justify-between gap-3 text-red-200">
-            <div className="flex items-center gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-              <span className="text-xs font-medium">{error}</span>
+          <div className="p-3 rounded-md bg-red-950/30 border border-red-900/40 flex items-center justify-between text-xs text-red-200">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <span>{error}</span>
             </div>
-            <button
-              onClick={fetchData}
-              className="px-3 py-1 bg-red-900/50 hover:bg-red-800/60 text-red-200 rounded text-xs font-medium transition-colors"
-            >
-              Retry
-            </button>
+            <button onClick={fetchData} className="underline text-red-300">Retry</button>
           </div>
         )}
 
-        {/* Clean System Metrics Grid */}
+        {/* Minimal System Metrics Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="dev-panel rounded-xl p-4 border border-zinc-800/80">
-            <div className="text-[11px] font-medium text-zinc-400 tracking-wide uppercase">
-              Active Fleet
-            </div>
-            <div className="text-2xl font-bold text-zinc-100 mt-1 font-mono">
+          <div className="p-3.5 rounded-lg border border-white/[0.06] bg-white/[0.01]">
+            <div className="text-[11px] font-medium text-zinc-500">Active Fleet</div>
+            <div className="text-xl font-bold text-zinc-100 mt-0.5 font-mono">
               {overview?.systemStats.totalAgents ?? 0}
             </div>
-            <div className="mt-1 flex items-center gap-1 text-[11px] text-zinc-500 font-medium">
-              <Cpu className="w-3 h-3 text-zinc-400" />
-              <span>Autonomous Workers</span>
-            </div>
           </div>
 
-          <div className="dev-panel rounded-xl p-4 border border-zinc-800/80">
-            <div className="text-[11px] font-medium text-zinc-400 tracking-wide uppercase">
-              Total Published
-            </div>
-            <div className="text-2xl font-bold text-zinc-100 mt-1 font-mono">
+          <div className="p-3.5 rounded-lg border border-white/[0.06] bg-white/[0.01]">
+            <div className="text-[11px] font-medium text-zinc-500">Total Published</div>
+            <div className="text-xl font-bold text-zinc-100 mt-0.5 font-mono">
               {overview?.systemStats.totalPosts ?? 0}
             </div>
-            <div className="mt-1 flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-              <CheckCircle2 className="w-3 h-3" />
-              <span>Editorial Approved</span>
-            </div>
           </div>
 
-          <div className="dev-panel rounded-xl p-4 border border-zinc-800/80">
-            <div className="text-[11px] font-medium text-zinc-400 tracking-wide uppercase">
-              Throughput Today
-            </div>
-            <div className="text-2xl font-bold text-zinc-100 mt-1 font-mono">
+          <div className="p-3.5 rounded-lg border border-white/[0.06] bg-white/[0.01]">
+            <div className="text-[11px] font-medium text-zinc-500">Throughput Today</div>
+            <div className="text-xl font-bold text-zinc-100 mt-0.5 font-mono">
               {overview?.systemStats.postsToday ?? 0}
             </div>
-            <div className="mt-1 flex items-center gap-1 text-[11px] text-zinc-500 font-medium">
-              <Clock className="w-3 h-3 text-zinc-400" />
-              <span>24h Publication Rate</span>
-            </div>
           </div>
 
-          <div className="dev-panel rounded-xl p-4 border border-zinc-800/80">
-            <div className="text-[11px] font-medium text-zinc-400 tracking-wide uppercase">
-              Discovered Topics
-            </div>
-            <div className="text-2xl font-bold text-zinc-100 mt-1 font-mono">
+          <div className="p-3.5 rounded-lg border border-white/[0.06] bg-white/[0.01]">
+            <div className="text-[11px] font-medium text-zinc-500">Discovered Candidates</div>
+            <div className="text-xl font-bold text-zinc-100 mt-0.5 font-mono">
               {overview?.systemStats.totalTopics ?? 0}
             </div>
-            <div className="mt-1 flex items-center gap-1 text-[11px] text-zinc-500 font-medium">
-              <Layers className="w-3 h-3 text-zinc-400" />
-              <span>Ingested Candidates</span>
-            </div>
           </div>
         </div>
 
-        {/* Breeth Memory & System Architecture Strip */}
-        <div className="dev-panel rounded-xl p-3.5 border border-zinc-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2.5">
-            <Database className="w-4 h-4 text-zinc-400 shrink-0" />
-            <div>
-              <span className="font-semibold text-zinc-200">Breeth Memory Engine</span>
-              <span className="text-zinc-500 ml-2">
-                Semantic Novelty & Duplicate Prevention
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-zinc-400 font-mono text-[11px]">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>api.thebreeth.com Active</span>
-          </div>
-        </div>
-
-        {/* Two Column Main Dashboard Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column (2/3 width): Fleet & Posts */}
-          <div className="lg:col-span-2 space-y-6">
+        {/* Two Column Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Left Column (2/3 width): Agent Fleet & Posts */}
+          <div className="lg:col-span-2 space-y-5">
             {/* Agent Fleet */}
-            <section className="space-y-3">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                <div className="flex items-center gap-2">
-                  <Bot className="w-4 h-4 text-zinc-400" />
-                  <h2 className="text-sm font-semibold text-zinc-200">Agent Fleet Operations</h2>
+            <section className="space-y-2.5">
+              <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+                  <Bot className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>Agent Fleet Operations</span>
                 </div>
-                <span className="text-xs text-zinc-500 font-mono">{overview?.agents.length || 0} active</span>
+                <span className="text-[11px] text-zinc-500 font-mono">{overview?.agents.length || 0} active</span>
               </div>
 
               {!overview?.agents || overview.agents.length === 0 ? (
-                <div className="dev-panel rounded-xl p-6 text-center space-y-3 border border-zinc-800">
-                  <p className="text-xs text-zinc-400">No active agents configured in database.</p>
+                <div className="p-5 rounded-lg border border-white/[0.06] bg-white/[0.01] text-center space-y-2 text-xs text-zinc-500">
+                  <p>No active agents running in database.</p>
                   <div className="flex items-center justify-center gap-2 pt-1">
                     <button
                       onClick={() => handleCreateSampleAgent('AI Security Researcher', 'AI Security')}
                       disabled={actionLoading.createSample}
-                      className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-medium transition-colors"
+                      className="px-2.5 py-1 rounded bg-zinc-900 border border-white/[0.08] hover:bg-zinc-800 text-zinc-300 text-xs transition-colors"
                     >
-                      + Add AI Security Agent
+                      + AI Security Agent
                     </button>
                     <button
                       onClick={() => handleCreateSampleAgent('AI Infrastructure Analyst', 'AI Infrastructure')}
                       disabled={actionLoading.createSample}
-                      className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 text-xs font-medium transition-colors"
+                      className="px-2.5 py-1 rounded bg-zinc-900 border border-white/[0.08] hover:bg-zinc-800 text-zinc-300 text-xs transition-colors"
                     >
-                      + Add AI Infra Agent
+                      + AI Infra Agent
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {overview.agents.map((agent, index) => {
-                    const badgeTheme = AGENT_BADGE_COLORS[index % AGENT_BADGE_COLORS.length];
+                  {overview.agents.map((agent) => {
                     const isPaused = agent.status === 'paused';
                     const stats = agent.stats || {};
 
                     return (
                       <div
                         key={agent.id}
-                        className={`dev-panel rounded-xl p-4 border transition-colors flex flex-col justify-between ${
-                          isPaused ? 'opacity-60 border-zinc-800' : 'border-zinc-800 hover:border-zinc-700'
+                        className={`p-3.5 rounded-lg border bg-white/[0.01] transition-colors flex flex-col justify-between ${
+                          isPaused ? 'opacity-50 border-white/[0.04]' : 'border-white/[0.06] hover:border-white/[0.12]'
                         }`}
                       >
-                        <div className="space-y-3">
+                        <div className="space-y-2.5">
                           <div className="flex items-start justify-between">
                             <div>
-                              <div className="flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full ${isPaused ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                                <h3 className="font-semibold text-sm text-zinc-100">{agent.name}</h3>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`w-1.5 h-1.5 rounded-full ${isPaused ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                                <h3 className="font-semibold text-xs text-zinc-100">{agent.name}</h3>
                               </div>
-                              <span className="text-xs text-zinc-500 font-mono mt-0.5 block">{agent.domain}</span>
+                              <span className="text-[11px] text-zinc-500 font-mono block mt-0.5">{agent.domain}</span>
                             </div>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium ${badgeTheme.bg} ${badgeTheme.border} ${badgeTheme.text}`}>
-                              {agent.status.toUpperCase()}
+                            <span className="text-[10px] font-mono text-zinc-400">
+                              {agent.status}
                             </span>
                           </div>
 
-                          {/* Pipeline Progress */}
-                          <div className="space-y-1.5 text-[11px]">
-                            <div className="flex justify-between text-zinc-400 font-mono">
-                              <span>Pipeline</span>
-                              <span>{stats.topicsPublished || 0} Published</span>
+                          {/* Pipeline Metrics */}
+                          <div className="space-y-1 text-[11px]">
+                            <div className="flex justify-between text-zinc-400 font-mono text-[10px]">
+                              <span>Pipeline Progress</span>
+                              <span>{stats.topicsPublished || 0} Posts</span>
                             </div>
-                            <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden flex border border-zinc-800">
-                              <div
-                                style={{ width: `${Math.min(100, ((stats.topicsPending || 0) / 10) * 100)}%` }}
-                                className="bg-zinc-600 h-full"
-                                title="Pending"
-                              />
-                              <div
-                                style={{ width: `${Math.min(100, ((stats.topicsSelected || 0) / 10) * 100)}%` }}
-                                className="bg-amber-500 h-full"
-                                title="Selected"
-                              />
-                              <div
-                                style={{ width: `${Math.min(100, ((stats.topicsPublished || 0) / 10) * 100)}%` }}
-                                className="bg-emerald-500 h-full"
-                                title="Published"
-                              />
+                            <div className="w-full bg-zinc-900 rounded-full h-1 overflow-hidden flex">
+                              <div style={{ width: `${Math.min(100, ((stats.topicsPending || 0) / 10) * 100)}%` }} className="bg-zinc-600 h-full" />
+                              <div style={{ width: `${Math.min(100, ((stats.topicsSelected || 0) / 10) * 100)}%` }} className="bg-amber-500 h-full" />
+                              <div style={{ width: `${Math.min(100, ((stats.topicsPublished || 0) / 10) * 100)}%` }} className="bg-emerald-500 h-full" />
                             </div>
-                            <div className="grid grid-cols-4 gap-1 text-[10px] text-zinc-500 font-mono pt-1 text-center">
-                              <div>Disc: {stats.totalTopicsDiscovered || 0}</div>
-                              <div>Pend: {stats.topicsPending || 0}</div>
-                              <div>Rej: {stats.topicsRejected || 0}</div>
-                              <div>Pub: {stats.topicsPublished || 0}</div>
+                            <div className="flex justify-between text-[10px] text-zinc-500 font-mono pt-0.5">
+                              <span>Discovered: {stats.totalTopicsDiscovered || 0}</span>
+                              <span>Pending: {stats.topicsPending || 0}</span>
+                              <span>Approved: {stats.topicsSelected || 0}</span>
                             </div>
+                          </div>
+
+                          {/* Breeth Memory Role in Agent Execution */}
+                          <div className="text-[10px] font-mono text-zinc-500 border-t border-white/[0.04] pt-1.5 flex items-center gap-1">
+                            <Database className="w-3 h-3 text-zinc-400 shrink-0" />
+                            <span>Breeth Memory: Novelty & Deduplication Active</span>
                           </div>
                         </div>
 
                         {/* Controls */}
-                        <div className="flex items-center justify-between pt-3 border-t border-zinc-800/80 mt-3 text-xs">
+                        <div className="flex items-center justify-between pt-2.5 border-t border-white/[0.04] mt-2.5 text-xs">
                           <div className="flex items-center gap-1.5">
                             {isPaused ? (
                               <button
                                 onClick={() => handleAgentAction(agent.id, 'resume')}
                                 disabled={actionLoading[`${agent.id}-resume`]}
-                                className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 transition-colors flex items-center gap-1 text-[11px]"
+                                className="px-2 py-0.5 rounded bg-zinc-900 border border-white/[0.08] text-zinc-300 hover:text-white text-[11px] transition-colors"
                               >
-                                <Play className="w-3 h-3 text-emerald-400" />
-                                <span>Resume</span>
+                                Resume
                               </button>
                             ) : (
                               <button
                                 onClick={() => handleAgentAction(agent.id, 'pause')}
                                 disabled={actionLoading[`${agent.id}-pause`]}
-                                className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 transition-colors flex items-center gap-1 text-[11px]"
+                                className="px-2 py-0.5 rounded bg-zinc-900 border border-white/[0.08] text-zinc-400 hover:text-zinc-200 text-[11px] transition-colors"
                               >
-                                <Pause className="w-3 h-3 text-amber-400" />
-                                <span>Pause</span>
+                                Pause
                               </button>
                             )}
 
                             <button
                               onClick={() => handleAgentAction(agent.id, 'trigger')}
                               disabled={actionLoading[`${agent.id}-trigger`]}
-                              className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 transition-colors flex items-center gap-1 text-[11px]"
-                              title="Run Discovery & Editorial Cycle Now"
+                              className="px-2 py-0.5 rounded bg-zinc-900 border border-white/[0.08] text-zinc-300 hover:text-white text-[11px] transition-colors flex items-center gap-1"
                             >
-                              <Zap className="w-3 h-3 text-indigo-400" />
-                              <span>Trigger Cycle</span>
+                              <Zap className="w-3 h-3 text-amber-400" />
+                              <span>Trigger</span>
                             </button>
                           </div>
 
                           <button
                             onClick={() => handleAgentAction(agent.id, 'delete')}
                             disabled={actionLoading[`${agent.id}-delete`]}
-                            className="p-1 rounded text-zinc-500 hover:text-red-400 transition-colors"
+                            className="text-zinc-600 hover:text-red-400 transition-colors"
                             title="Delete Agent"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -544,37 +468,39 @@ export default function App() {
             </section>
 
             {/* Published Posts */}
-            <section className="space-y-3">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-zinc-400" />
-                  <h2 className="text-sm font-semibold text-zinc-200">Recent Published Posts</h2>
+            <section className="space-y-2.5">
+              <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+                  <FileText className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>Published Output</span>
                 </div>
-                <span className="text-xs text-zinc-500 font-mono">{filteredPosts.length} posts</span>
+                <span className="text-[11px] text-zinc-500 font-mono">{filteredPosts.length} posts</span>
               </div>
 
               {filteredPosts.length === 0 ? (
-                <div className="dev-panel rounded-xl p-6 text-center text-xs text-zinc-500 border border-zinc-800">
-                  No published posts found. Autonomous workers evaluate candidate topics continuously.
+                <div className="p-4 rounded-lg border border-white/[0.06] text-center text-xs text-zinc-500">
+                  No published posts yet. Candidate stories are evaluated continuously.
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {filteredPosts.map((post) => (
-                    <div key={post.id} className="dev-panel rounded-xl p-4 border border-zinc-800 space-y-2.5">
-                      <div className="flex items-center justify-between">
+                    <div key={post.id} className="p-3.5 rounded-lg border border-white/[0.06] bg-white/[0.01] space-y-2">
+                      <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 border border-zinc-700 text-zinc-300">
-                            {post.agentName}
-                          </span>
-                          <span className="text-xs text-zinc-500 font-mono">{post.agentDomain}</span>
+                          <span className="text-zinc-200 font-semibold">{post.agentName}</span>
+                          <span className="text-[11px] text-zinc-500 font-mono">{post.agentDomain}</span>
                         </div>
-                        <span className="text-xs text-zinc-500 font-mono">{formatTime(post.createdAt)}</span>
+                        <span className="text-[11px] text-zinc-500 font-mono">{formatTime(post.createdAt)}</span>
                       </div>
 
-                      <p className="text-xs text-zinc-200 leading-relaxed font-sans">{post.text}</p>
+                      <p className="text-xs text-zinc-300 leading-relaxed">{post.text}</p>
 
-                      <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-between text-[11px] text-zinc-500 font-mono">
-                        <span className="truncate max-w-md">Rationale: {post.rationale}</span>
+                      <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate max-w-xs">Rationale: {post.rationale}</span>
+                          <span>•</span>
+                          <span className="text-emerald-400">Breeth Verified</span>
+                        </div>
                         {post.sources && post.sources.length > 0 && (
                           <a
                             href={post.sources[0]}
@@ -594,33 +520,34 @@ export default function App() {
             </section>
           </div>
 
-          {/* Right Column (1/3 width): Live Editorial Stream */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-zinc-400" />
-                <h2 className="text-sm font-semibold text-zinc-200">Editorial Activity Stream</h2>
+          {/* Right Column (1/3 width): Live Editorial Stream with Breeth Role */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+              <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+                <Activity className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Editorial Stream</span>
               </div>
-              <div className="flex items-center gap-1 text-[10px] font-mono">
+              <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500">
                 <button
                   onClick={() => setActivityFilter('all')}
-                  className={`px-2 py-0.5 rounded ${activityFilter === 'all' ? 'bg-zinc-800 text-zinc-200' : 'text-zinc-500'}`}
+                  className={activityFilter === 'all' ? 'text-zinc-200 font-bold' : 'hover:text-zinc-300'}
                 >
                   All
                 </button>
+                <span>•</span>
                 <button
                   onClick={() => setActivityFilter('topic_selected')}
-                  className={`px-2 py-0.5 rounded ${activityFilter === 'topic_selected' ? 'bg-zinc-800 text-zinc-200' : 'text-zinc-500'}`}
+                  className={activityFilter === 'topic_selected' ? 'text-zinc-200 font-bold' : 'hover:text-zinc-300'}
                 >
                   Approved
                 </button>
               </div>
             </div>
 
-            <div className="dev-panel rounded-xl p-3 border border-zinc-800 max-h-[600px] overflow-y-auto space-y-2">
+            <div className="p-2 rounded-lg border border-white/[0.06] bg-white/[0.01] max-h-[580px] overflow-y-auto space-y-2">
               {filteredActivity.length === 0 ? (
                 <div className="p-4 text-center text-xs text-zinc-500">
-                  No activity entries matching filter.
+                  No activity entries recorded yet.
                 </div>
               ) : (
                 filteredActivity.map((item, idx) => {
@@ -628,14 +555,14 @@ export default function App() {
                   return (
                     <div
                       key={idx}
-                      className="p-2.5 rounded-lg bg-zinc-900/60 border border-zinc-800/80 space-y-1 text-xs"
+                      className="p-2.5 rounded-md border border-white/[0.04] bg-zinc-900/40 space-y-1 text-xs"
                     >
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-mono text-zinc-400">{item.agentName}</span>
-                        <span className="font-mono text-zinc-500">{formatTime(item.timestamp)}</span>
+                      <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                        <span>{item.agentName}</span>
+                        <span>{formatTime(item.timestamp)}</span>
                       </div>
 
-                      <div className="flex items-start gap-2">
+                      <div className="flex items-start gap-1.5">
                         {isApproved ? (
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                         ) : (
@@ -644,14 +571,17 @@ export default function App() {
                         <span className="text-zinc-300 font-medium leading-snug line-clamp-2">{item.title}</span>
                       </div>
 
-                      {item.score !== undefined && (
-                        <div className="flex justify-between items-center text-[10px] font-mono pt-1 text-zinc-500">
-                          <span>Decision: {isApproved ? 'Approved' : 'Rejected'}</span>
-                          <span className={`font-bold ${item.score >= 6.0 ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                      <div className="flex items-center justify-between text-[10px] font-mono pt-1 text-zinc-500 border-t border-white/[0.03]">
+                        {/* Show Breeth's exact selection & novelty checking role */}
+                        <span>
+                          {isApproved ? 'Breeth Check: Passed (Novel)' : 'Breeth Memory: Filtered'}
+                        </span>
+                        {item.score !== undefined && (
+                          <span className={item.score >= 6.0 ? 'text-emerald-400 font-semibold' : 'text-zinc-500'}>
                             Score: {item.score.toFixed(1)}
                           </span>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   );
                 })
