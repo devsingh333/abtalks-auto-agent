@@ -6,7 +6,7 @@ import { logger } from './utils/logger';
 import { handleInitAgent } from './api/agent-init.route';
 import { handleGetAgentFeed } from './api/agent-feed.route';
 import { handleHealth } from './api/health.route';
-import { handleMonitorOverview, handleMonitorActivity, handleMonitorPosts, handleAgentPause, handleAgentResume, handleAgentDelete, handleAgentTriggerCycle } from './api/monitor.route';
+import { handleMonitorOverview, handleAgentDetails, handleMonitorActivity, handleMonitorPosts, handleAgentPause, handleAgentResume, handleAgentDelete, handleAgentTriggerCycle } from './api/monitor.route';
 
 export const app = express();
 
@@ -45,6 +45,7 @@ app.get('/health', handleHealth);
 
 // Monitoring API Routes
 app.get('/api/monitor/overview', handleMonitorOverview);
+app.get('/api/monitor/agent/:id/details', handleAgentDetails);
 app.get('/api/monitor/activity', handleMonitorActivity);
 app.get('/api/monitor/posts', handleMonitorPosts);
 app.post('/api/monitor/agent/:id/pause', handleAgentPause);

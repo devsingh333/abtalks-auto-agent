@@ -37,14 +37,18 @@ export async function handleMonitorOverview(_req: Request, res: Response) {
           prisma.post.count({ where: { agentId: agent.id, createdAt: { gte: todayStart } } }),
         ]);
 
-        const persona = JSON.parse(agent.personaConfig);
+        let persona = {};
+        try {
+          persona = JSON.parse(agent.personaConfig);
+        } catch (e) {}
 
         return {
           id: agent.id,
-          name: persona.name || agent.name,
-          domain: persona.domain || agent.domain,
+          name: (persona as any).name || agent.name,
+          domain: (persona as any).domain || agent.domain,
           status: agent.status,
           createdAt: agent.createdAt.toISOString(),
+          personaConfig: agent.personaConfig,
           stats: {
             totalTopicsDiscovered,
             topicsPending,
@@ -73,14 +77,80 @@ export async function handleMonitorOverview(_req: Request, res: Response) {
 }
 
 /**
+ * GET /api/monitor/agent/:id/details
+ * Returns deep-dive details for an agent: persona profile, post queue, recent publications, and schedule.
+ */
+export async function handleAgentDetails(req: Request, res: Response) {
+  try {
+    const id = req.params.id as string;
+    const agent = await AgentRepository.findById(id);
+    if (!agent) return res.status(404).json({ error: 'Agent not found' });
+
+    // Fetch pending topic queue (discovered & selected)
+    const pendingQueue = await prisma.topic.findMany({
+      where: {
+        agentId: id,
+        status: { in: ['discovered', 'selected'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    // Fetch recent posts
+    const recentPosts = await prisma.post.findMany({
+      where: { agentId: id },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
+      include: { topic: true, sources: true },
+    });
+
+    let persona = {};
+    try {
+      persona = JSON.parse(agent.personaConfig);
+    } catch (e) {}
+
+    return res.status(200).json({
+      agent: {
+        id: agent.id,
+        name: (persona as any).name || agent.name,
+        domain: (persona as any).domain || agent.domain,
+        status: agent.status,
+        createdAt: agent.createdAt.toISOString(),
+        persona,
+      },
+      pendingQueue: pendingQueue.map((t) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        score: t.score,
+        canonicalUrl: t.canonicalUrl,
+        createdAt: t.createdAt.toISOString(),
+      })),
+      recentPosts: recentPosts.map((p) => ({
+        id: p.id,
+        title: p.topic.title,
+        text: p.text,
+        rationale: p.rationale,
+        createdAt: p.createdAt.toISOString(),
+      })),
+      workerSchedule: {
+        intervalMinutes: 5,
+        status: agent.status === 'active' ? 'Active (Every 5 mins)' : 'Paused',
+      },
+    });
+  } catch (err) {
+    logger.error('Error in /api/monitor/agent/details', {}, err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
  * GET /api/monitor/activity?limit=50
- * Returns recent editorial decisions and post publications as an activity feed.
  */
 export async function handleMonitorActivity(req: Request, res: Response) {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
 
-    // Fetch recent editorial decisions
     const decisions = await prisma.editorialDecision.findMany({
       orderBy: { createdAt: 'desc' },
       take: limit,
@@ -93,7 +163,6 @@ export async function handleMonitorActivity(req: Request, res: Response) {
       },
     });
 
-    // Fetch recent posts
     const posts = await prisma.post.findMany({
       orderBy: { createdAt: 'desc' },
       take: limit,
@@ -103,7 +172,6 @@ export async function handleMonitorActivity(req: Request, res: Response) {
       },
     });
 
-    // Combine and sort by timestamp
     const activity: Array<{
       type: string;
       agentId: string;
@@ -115,7 +183,8 @@ export async function handleMonitorActivity(req: Request, res: Response) {
     }> = [];
 
     for (const post of posts) {
-      const persona = JSON.parse(post.agent.personaConfig);
+      let persona: any = {};
+      try { persona = JSON.parse(post.agent.personaConfig); } catch (e) {}
       activity.push({
         type: 'post_published',
         agentId: post.agentId,
@@ -127,7 +196,8 @@ export async function handleMonitorActivity(req: Request, res: Response) {
     }
 
     for (const decision of decisions) {
-      const persona = JSON.parse(decision.topic.agent.personaConfig);
+      let persona: any = {};
+      try { persona = JSON.parse(decision.topic.agent.personaConfig); } catch (e) {}
       activity.push({
         type: decision.decision === 'publish' ? 'topic_selected' : 'topic_rejected',
         agentId: decision.topic.agentId,
@@ -139,7 +209,6 @@ export async function handleMonitorActivity(req: Request, res: Response) {
       });
     }
 
-    // Sort descending by timestamp
     activity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     return res.status(200).json({ activity: activity.slice(0, limit) });
@@ -151,7 +220,6 @@ export async function handleMonitorActivity(req: Request, res: Response) {
 
 /**
  * GET /api/monitor/posts?limit=20
- * Returns recently published posts with agent and topic metadata.
  */
 export async function handleMonitorPosts(req: Request, res: Response) {
   try {
@@ -168,7 +236,8 @@ export async function handleMonitorPosts(req: Request, res: Response) {
     });
 
     const formattedPosts = posts.map((post) => {
-      const persona = JSON.parse(post.agent.personaConfig);
+      let persona: any = {};
+      try { persona = JSON.parse(post.agent.personaConfig); } catch (e) {}
       return {
         id: post.id,
         agentId: post.agentId,
@@ -191,7 +260,6 @@ export async function handleMonitorPosts(req: Request, res: Response) {
 
 /**
  * POST /api/monitor/agent/:id/pause
- * Pauses an agent's autonomous worker.
  */
 export async function handleAgentPause(req: Request, res: Response) {
   try {
@@ -211,7 +279,6 @@ export async function handleAgentPause(req: Request, res: Response) {
 
 /**
  * POST /api/monitor/agent/:id/resume
- * Resumes an agent's autonomous worker.
  */
 export async function handleAgentResume(req: Request, res: Response) {
   try {
@@ -231,7 +298,6 @@ export async function handleAgentResume(req: Request, res: Response) {
 
 /**
  * DELETE /api/monitor/agent/:id
- * Deletes an agent and stops its worker.
  */
 export async function handleAgentDelete(req: Request, res: Response) {
   try {
@@ -251,7 +317,6 @@ export async function handleAgentDelete(req: Request, res: Response) {
 
 /**
  * POST /api/monitor/agent/:id/trigger
- * Manually triggers an immediate autonomous cycle for an agent.
  */
 export async function handleAgentTriggerCycle(req: Request, res: Response) {
   try {
@@ -260,7 +325,6 @@ export async function handleAgentTriggerCycle(req: Request, res: Response) {
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
     if (agent.status !== 'active') return res.status(400).json({ error: 'Agent is not active' });
 
-    // Fire and forget - don't block the response
     autonomousWorker.executeCycle(id).catch((err) => {
       logger.error('Manually triggered cycle failed', { agentId: id }, err);
     });

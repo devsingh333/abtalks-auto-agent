@@ -31,6 +31,8 @@ import {
   Check,
   UserCheck,
   Plus,
+  ListOrdered,
+  Calendar,
 } from 'lucide-react';
 
 interface AgentStats {
@@ -67,6 +69,36 @@ interface Agent {
   createdAt: string;
   personaConfig?: string;
   stats: AgentStats;
+}
+
+interface AgentDeepDetails {
+  agent: {
+    id: string;
+    name: string;
+    domain: string;
+    status: 'active' | 'paused';
+    createdAt: string;
+    persona: PersonaConfig;
+  };
+  pendingQueue: Array<{
+    id: string;
+    title: string;
+    status: string;
+    score: number | null;
+    canonicalUrl: string;
+    createdAt: string;
+  }>;
+  recentPosts: Array<{
+    id: string;
+    title: string;
+    text: string;
+    rationale: string;
+    createdAt: string;
+  }>;
+  workerSchedule: {
+    intervalMinutes: number;
+    status: string;
+  };
 }
 
 interface SystemStats {
@@ -125,6 +157,8 @@ export default function App() {
   const [expandedReasonIdx, setExpandedReasonIdx] = useState<number | null>(null);
   const [selectedPostDetails, setSelectedPostDetails] = useState<PostItem | null>(null);
   const [selectedAgentPersona, setSelectedAgentPersona] = useState<{ agentName: string; persona: PersonaConfig } | null>(null);
+  const [deepAgentDetails, setDeepAgentDetails] = useState<AgentDeepDetails | null>(null);
+  const [loadingAgentDetails, setLoadingAgentDetails] = useState<boolean>(false);
   const [activityFilter, setActivityFilter] = useState<'all' | 'topic_selected' | 'topic_rejected'>('all');
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
@@ -163,6 +197,20 @@ export default function App() {
       setError(err.message || 'Connection lost to server');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAgentDeepDetails = async (agentId: string) => {
+    setLoadingAgentDetails(true);
+    try {
+      const res = await fetch(`/api/monitor/agent/${agentId}/details`);
+      if (!res.ok) throw new Error('Failed to fetch agent details');
+      const data = await res.json();
+      setDeepAgentDetails(data);
+    } catch (err: any) {
+      addToast(`Error fetching agent queue: ${err.message}`, 'error');
+    } finally {
+      setLoadingAgentDetails(false);
     }
   };
 
@@ -207,6 +255,9 @@ export default function App() {
       };
       addToast(actionLabels[action], 'success');
       await fetchData();
+      if (deepAgentDetails && deepAgentDetails.agent.id === agentId) {
+        await fetchAgentDeepDetails(agentId);
+      }
     } catch (err: any) {
       addToast(`Error: ${err.message}`, 'error');
     } finally {
@@ -229,7 +280,7 @@ export default function App() {
       }
 
       const data = await res.json();
-      addToast(`Initialized Persona Agent: ${data.agentId.substring(0, 8)}`, 'success');
+      addToast(`Initialized Persona Agent & triggered cycle`, 'success');
       setShowNewPersonaModal(false);
       await fetchData();
     } catch (err: any) {
@@ -384,7 +435,7 @@ export default function App() {
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <div className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-indigo-400" />
-                <h3 className="font-semibold text-sm text-zinc-100">Orbix Autonomous Architecture Guide</h3>
+                <h3 className="font-semibold text-sm text-zinc-100">Orbix Autonomous Architecture Guide & Pipeline Labels</h3>
               </div>
               <button onClick={() => setShowGuide(false)} className="text-zinc-500 hover:text-zinc-300">
                 <X className="w-4 h-4" />
@@ -420,6 +471,33 @@ export default function App() {
                 <p className="text-[11px] text-zinc-400 leading-relaxed">
                   Evaluates candidate stories against minimum hard requirements. If 0 candidates pass, an autonomous second-pass safeguard reviews top stories.
                 </p>
+              </div>
+            </div>
+
+            {/* Detailed Definitions of Pipeline Labels */}
+            <div className="p-4 rounded-lg bg-zinc-950/80 border border-white/[0.06] space-y-2 font-mono text-[11px]">
+              <span className="font-semibold text-zinc-200 block">Pipeline Status Label Definitions:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2 text-[10px]">
+                <div className="p-2 rounded bg-zinc-900 border border-white/[0.04]">
+                  <strong className="text-zinc-300 block">Discovered:</strong>
+                  Raw story candidates ingested from search feeds.
+                </div>
+                <div className="p-2 rounded bg-zinc-900 border border-white/[0.04]">
+                  <strong className="text-zinc-400 block">Pending:</strong>
+                  Awaiting Entity Gate & Editorial Judge scoring.
+                </div>
+                <div className="p-2 rounded bg-zinc-900 border border-amber-500/20">
+                  <strong className="text-amber-400 block">Selected:</strong>
+                  Passed all gates & approved by Editorial Judge (Score &ge; 6.0).
+                </div>
+                <div className="p-2 rounded bg-zinc-900 border border-emerald-500/20">
+                  <strong className="text-emerald-400 block">Published:</strong>
+                  Post generated in persona's technical voice & committed.
+                </div>
+                <div className="p-2 rounded bg-zinc-900 border border-red-500/20">
+                  <strong className="text-red-400 block">Rejected:</strong>
+                  Filtered due to duplicate memory or low editorial score.
+                </div>
               </div>
             </div>
           </div>
@@ -596,20 +674,15 @@ export default function App() {
                               </div>
                             </div>
 
-                            {/* Consistent Persona & Breeth Role Integration */}
+                            {/* Inspect Queue & Details Link */}
                             <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between text-[11px] font-mono">
-                              <span className="text-zinc-500 flex items-center gap-1.5 truncate">
-                                <Database className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                                <span className="truncate">Breeth Novelty Checked</span>
-                              </span>
-                              {parsedPersona && (
-                                <button
-                                  onClick={() => setSelectedAgentPersona({ agentName: agent.name, persona: parsedPersona! })}
-                                  className="text-indigo-400 hover:text-indigo-300 underline font-sans text-xs shrink-0"
-                                >
-                                  Persona Stance
-                                </button>
-                              )}
+                              <button
+                                onClick={() => fetchAgentDeepDetails(agent.id)}
+                                className="text-indigo-400 hover:text-indigo-300 font-sans text-xs font-semibold flex items-center gap-1 underline"
+                              >
+                                <ListOrdered className="w-3.5 h-3.5" />
+                                <span>Inspect Agent & Post Queue ({stats.topicsPending || 0})</span>
+                              </button>
                             </div>
                           </div>
 
@@ -817,6 +890,118 @@ export default function App() {
         </div>
       </main>
 
+      {/* Modal: Deep Agent Details, Post Queue & Schedule Inspector */}
+      {deepAgentDetails &&
+        ReactDOM.createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-3xl w-full max-h-[85vh] flex flex-col p-6 space-y-4 shadow-2xl relative">
+              <button
+                onClick={() => setDeepAgentDetails(null)}
+                className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 shrink-0">
+                <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                  <Bot className="w-4 h-4 text-indigo-400" />
+                  <span>Agent Deep Inspection: {deepAgentDetails.agent.name}</span>
+                </div>
+                <span className="text-xs font-mono text-emerald-400">{deepAgentDetails.workerSchedule.status}</span>
+              </div>
+
+              <div className="overflow-y-auto space-y-5 pr-1 text-xs">
+                {/* Schedule & Timing Bar */}
+                <div className="p-3.5 rounded-lg border border-white/[0.06] bg-zinc-950 flex flex-wrap items-center justify-between text-xs font-mono gap-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Autonomous Cycle Schedule: <strong className="text-zinc-100">Every 5 Minutes</strong></span>
+                  </div>
+                  <button
+                    onClick={() => handleAgentAction(deepAgentDetails.agent.id, 'trigger')}
+                    className="px-3 py-1 rounded bg-indigo-600/20 border border-indigo-500/40 text-indigo-200 hover:bg-indigo-600/30 transition-colors flex items-center gap-1"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Run Immediate Cycle</span>
+                  </button>
+                </div>
+
+                {/* Persona Profile Summary */}
+                <div className="p-3.5 rounded-lg border border-white/[0.06] bg-white/[0.01] space-y-2">
+                  <span className="text-[11px] font-mono text-zinc-500 block">Persona Identity & Role:</span>
+                  <div className="font-semibold text-zinc-100">{deepAgentDetails.agent.persona.name} — <span className="text-indigo-400 font-mono text-xs">{deepAgentDetails.agent.persona.role || deepAgentDetails.agent.domain}</span></div>
+                  <p className="text-zinc-300 leading-relaxed text-[11px]">{deepAgentDetails.agent.persona.identity}</p>
+                </div>
+
+                {/* Discovered Post Queue */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/[0.04] pb-2 font-semibold text-zinc-200">
+                    <div className="flex items-center gap-2">
+                      <ListOrdered className="w-4 h-4 text-indigo-400" />
+                      <span>Discovered & Approved Topic Queue ({deepAgentDetails.pendingQueue.length})</span>
+                    </div>
+                    <span className="text-[11px] font-mono text-zinc-500">Queued Stories</span>
+                  </div>
+
+                  {deepAgentDetails.pendingQueue.length === 0 ? (
+                    <div className="p-4 rounded-lg bg-zinc-950 text-center text-[11px] text-zinc-500">
+                      No pending topics currently in queue for this agent.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                      {deepAgentDetails.pendingQueue.map((item) => (
+                        <div key={item.id} className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04] flex items-center justify-between gap-3 text-xs">
+                          <div className="min-w-0">
+                            <span className="text-zinc-200 font-medium block truncate">{item.title}</span>
+                            <span className="text-[10px] text-zinc-500 font-mono">{formatTime(item.createdAt)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 font-mono text-[11px]">
+                            <span className={`px-2 py-0.5 rounded text-[10px] ${item.status === 'selected' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-zinc-800 text-zinc-400'}`}>
+                              {item.status}
+                            </span>
+                            {item.score !== null && (
+                              <span className="text-emerald-400 font-semibold">{item.score.toFixed(1)}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recent Published Posts by Agent */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/[0.04] pb-2 font-semibold text-zinc-200">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-emerald-400" />
+                      <span>Published Output Stream ({deepAgentDetails.recentPosts.length})</span>
+                    </div>
+                  </div>
+
+                  {deepAgentDetails.recentPosts.length === 0 ? (
+                    <div className="p-4 rounded-lg bg-zinc-950 text-center text-[11px] text-zinc-500">
+                      No posts published by this agent yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                      {deepAgentDetails.recentPosts.map((post) => (
+                        <div key={post.id} className="p-3.5 rounded-lg bg-zinc-950 border border-white/[0.04] space-y-2 text-xs">
+                          <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500">
+                            <span className="truncate max-w-sm">{post.title}</span>
+                            <span>{formatTime(post.createdAt)}</span>
+                          </div>
+                          <p className="text-zinc-300 leading-relaxed font-sans text-xs">{post.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
       {/* Modal: Launch New Original Persona Agent */}
       {showNewPersonaModal &&
         ReactDOM.createPortal(
@@ -886,72 +1071,6 @@ export default function App() {
                   <span className="text-xs text-zinc-400 font-mono block">Robotics & Embodied AI Engineer</span>
                   <p className="text-[11px] text-zinc-500 leading-normal">Focuses on Vision-Language-Action (VLA) models, spatial intelligence, ROS 2, and physical robot deployments.</p>
                 </div>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
-
-      {/* Modal: View Active Persona Profile & Stance */}
-      {selectedAgentPersona &&
-        ReactDOM.createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-            <div className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative">
-              <button
-                onClick={() => setSelectedAgentPersona(null)}
-                className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100 border-b border-white/[0.08] pb-3">
-                <UserCheck className="w-4 h-4 text-indigo-400" />
-                <span>Persona Profile & Editorial Stance</span>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div>
-                  <span className="text-[11px] text-zinc-500 font-mono block">Persona Identity:</span>
-                  <span className="font-semibold text-zinc-100 text-sm">{selectedAgentPersona.persona.name}</span>
-                  {selectedAgentPersona.persona.role && (
-                    <span className="text-xs text-indigo-400 font-mono block mt-0.5">{selectedAgentPersona.persona.role}</span>
-                  )}
-                  <p className="text-zinc-300 text-xs leading-relaxed mt-1">{selectedAgentPersona.persona.identity}</p>
-                </div>
-
-                <div>
-                  <span className="text-[11px] text-zinc-500 font-mono block">Stable Technical Interests:</span>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    {selectedAgentPersona.persona.interests.map((interest, idx) => (
-                      <span key={idx} className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 text-[11px] font-mono">
-                        {interest}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {selectedAgentPersona.persona.editorialPrinciples && (
-                  <div>
-                    <span className="text-[11px] text-zinc-500 font-mono block">Distinct Editorial Principles:</span>
-                    <ul className="list-disc list-inside text-zinc-300 space-y-1 mt-1 text-[11px]">
-                      {selectedAgentPersona.persona.editorialPrinciples.map((p, i) => (
-                        <li key={i}>{p}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {selectedAgentPersona.persona.voice && (
-                  <div className="p-3 rounded bg-zinc-950 border border-white/[0.06] space-y-1 font-mono text-[11px]">
-                    <span className="text-emerald-400 font-semibold block">Writing Style & Voice Guidelines:</span>
-                    <div>Tone: <span className="text-zinc-300">{selectedAgentPersona.persona.voice.tone}</span></div>
-                    <div>Style: <span className="text-zinc-300">{selectedAgentPersona.persona.voice.style}</span></div>
-                    <div>Target Length: <span className="text-zinc-300">{selectedAgentPersona.persona.voice.length}</span></div>
-                    {selectedAgentPersona.persona.voice.stance && (
-                      <div>Editorial Stance: <span className="text-zinc-300">{selectedAgentPersona.persona.voice.stance}</span></div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </div>,
