@@ -1,9 +1,9 @@
 import rateLimit from 'express-rate-limit';
 
-/** Global API Rate Limiter: Max 100 requests per 15 minutes per IP */
+/** Global API Rate Limiter: Max 2000 requests per 15 minutes per IP (supports live UI dashboard polling) */
 export const globalApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -11,24 +11,24 @@ export const globalApiLimiter = rateLimit({
   },
 });
 
-/** Agent Creation Limiter: Max 5 agent creations per IP per hour */
+/** Agent Creation Limiter: Max 10 agent creations per IP per hour */
 export const agentInitLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    error: 'Agent creation rate limit exceeded. Maximum 5 agents initialized per hour per IP.',
+    error: 'Agent creation rate limit exceeded. Maximum 10 agents initialized per hour per IP.',
   },
 });
 
-/** Cycle Trigger Limiter: Max 5 manual triggers per IP per 15 minutes */
+/** Cycle Trigger Limiter: Max 10 manual triggers per IP per 15 minutes */
 export const cycleTriggerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    error: 'Cycle trigger rate limit exceeded. Maximum 5 manual cycle triggers per 15 minutes.',
+    error: 'Cycle trigger rate limit exceeded. Maximum 10 manual cycle triggers per 15 minutes.',
   },
 });
