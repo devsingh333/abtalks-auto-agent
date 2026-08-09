@@ -33,6 +33,8 @@ import {
   Plus,
   ListOrdered,
   Calendar,
+  Code,
+  Terminal,
 } from 'lucide-react';
 
 interface AgentStats {
@@ -137,6 +139,30 @@ interface PostItem {
   createdAt: string;
 }
 
+interface AiLogItem {
+  id: string;
+  timestamp: string;
+  model: string;
+  provider: string;
+  purpose: string;
+  promptTokensEst: number;
+  completionTokensEst: number;
+  latencyMs: number;
+  status: 'success' | 'fallback' | 'error';
+  agentId?: string;
+  promptSnippet: string;
+  responseSnippet: string;
+}
+
+interface AiStats {
+  totalCalls: number;
+  successCalls: number;
+  failedCalls: number;
+  avgLatencyMs: number;
+  totalTokensEst: number;
+  providerBreakdown: Record<string, number>;
+}
+
 interface OverviewData {
   agents: Agent[];
   systemStats: SystemStats;
@@ -173,6 +199,10 @@ export default function App() {
   const [showGuide, setShowGuide] = useState<boolean>(false);
   const [showControlsHelp, setShowControlsHelp] = useState<boolean>(false);
   const [showNewPersonaModal, setShowNewPersonaModal] = useState<boolean>(false);
+  const [showAiLogsModal, setShowAiLogsModal] = useState<boolean>(false);
+  const [aiLogs, setAiLogs] = useState<AiLogItem[]>([]);
+  const [aiStats, setAiStats] = useState<AiStats | null>(null);
+  const [expandedAiLogId, setExpandedAiLogId] = useState<string | null>(null);
   const [copiedAgentId, setCopiedAgentId] = useState<string | null>(null);
   const [expandedReasonIdx, setExpandedReasonIdx] = useState<number | null>(null);
   const [selectedPostDetails, setSelectedPostDetails] = useState<PostItem | null>(null);
@@ -188,6 +218,19 @@ export default function App() {
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
+  };
+
+  const fetchAiLogs = async () => {
+    try {
+      const res = await fetch('/api/monitor/ai-logs?limit=50');
+      if (res.ok) {
+        const data = await res.json();
+        setAiLogs(data.logs || []);
+        setAiStats(data.stats || null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch AI telemetry logs', err);
+    }
   };
 
   const fetchData = async () => {
@@ -211,6 +254,7 @@ export default function App() {
       setActivity(activityData.activity || []);
       setPosts(postsData.posts || []);
       setLastUpdated(new Date());
+      await fetchAiLogs();
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Connection lost to server');
@@ -387,6 +431,23 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* AI Live Usage Logs Button */}
+            <button
+              onClick={() => {
+                fetchAiLogs();
+                setShowAiLogsModal(true);
+              }}
+              className="px-3 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-medium transition-all flex items-center gap-1.5"
+            >
+              <Cpu className="w-3.5 h-3.5 text-purple-400" />
+              <span className="hidden sm:inline">AI Live Logs</span>
+              {aiStats && aiStats.totalCalls > 0 && (
+                <span className="px-1.5 py-0.2 rounded bg-purple-500/30 text-[10px] text-purple-200 font-mono">
+                  {aiStats.totalCalls}
+                </span>
+              )}
+            </button>
+
             {/* New Persona Agent Button */}
             <button
               onClick={() => setShowNewPersonaModal(true)}
@@ -914,6 +975,115 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* Modal: AI Live Usage Telemetry Logs */}
+      {showAiLogsModal &&
+        ReactDOM.createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-4xl w-full max-h-[88vh] flex flex-col p-6 space-y-4 shadow-2xl relative">
+              <button
+                onClick={() => setShowAiLogsModal(false)}
+                className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 shrink-0">
+                <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                  <Cpu className="w-4 h-4 text-purple-400" />
+                  <span>AI Live Usage Stream & Telemetry Logs</span>
+                </div>
+                <button
+                  onClick={fetchAiLogs}
+                  className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-mono text-zinc-300 transition-colors flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Refresh Logs</span>
+                </button>
+              </div>
+
+              {/* AI Usage Statistics Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
+                  <span className="text-zinc-500 block text-[10px]">Total AI Calls</span>
+                  <span className="text-lg font-bold text-purple-300">{aiStats?.totalCalls || 0}</span>
+                </div>
+                <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
+                  <span className="text-zinc-500 block text-[10px]">Avg Latency</span>
+                  <span className="text-lg font-bold text-emerald-400">{aiStats?.avgLatencyMs || 0} ms</span>
+                </div>
+                <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
+                  <span className="text-zinc-500 block text-[10px]">Total Tokens Est.</span>
+                  <span className="text-lg font-bold text-amber-300">~{aiStats?.totalTokensEst.toLocaleString() || 0}</span>
+                </div>
+                <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
+                  <span className="text-zinc-500 block text-[10px]">Primary Model</span>
+                  <span className="text-xs font-bold text-indigo-300 truncate block mt-1">Nemotron 550B</span>
+                </div>
+              </div>
+
+              {/* Live Log Stream Table / List */}
+              <div className="overflow-y-auto space-y-3 pr-1 text-xs">
+                {aiLogs.length === 0 ? (
+                  <div className="p-8 text-center text-zinc-500 font-mono">
+                    No AI telemetry logs recorded yet. Cycles will log real-time NVIDIA/Gemini API calls here.
+                  </div>
+                ) : (
+                  aiLogs.map((log) => {
+                    const isExpanded = expandedAiLogId === log.id;
+                    return (
+                      <div key={log.id} className="p-3.5 rounded-lg bg-zinc-950 border border-white/[0.04] space-y-2 font-mono">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-semibold text-[10px]">
+                              {log.provider}
+                            </span>
+                            <span className="text-zinc-200 font-semibold">{log.purpose}</span>
+                          </div>
+                          <span className="text-zinc-500">{formatTime(log.timestamp)}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-white/[0.03]">
+                          <span>Model: <strong className="text-zinc-200">{log.model}</strong></span>
+                          <span>Latency: <strong className="text-emerald-400">{log.latencyMs}ms</strong></span>
+                          <span>Tokens: <strong className="text-amber-400">~{log.promptTokensEst + log.completionTokensEst}</strong></span>
+                          <span className={log.status === 'success' ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
+                            {log.status.toUpperCase()}
+                          </span>
+                        </div>
+
+                        {/* Expandable Prompt / Response Drawer */}
+                        <div className="pt-1">
+                          <button
+                            onClick={() => setExpandedAiLogId(isExpanded ? null : log.id)}
+                            className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                          >
+                            <Terminal className="w-3 h-3" />
+                            <span>{isExpanded ? 'Hide Full Prompt & JSON Response' : 'Inspect Prompt & Response Payload'}</span>
+                          </button>
+
+                          {isExpanded && (
+                            <div className="mt-2 space-y-2 text-[10px] animate-fade-in">
+                              <div className="p-2.5 rounded bg-zinc-900 border border-white/[0.06] text-zinc-300 space-y-1">
+                                <strong className="text-purple-400 block">Prompt Payload Snippet:</strong>
+                                <p className="font-mono text-zinc-400 leading-relaxed whitespace-pre-wrap">{log.promptSnippet}</p>
+                              </div>
+                              <div className="p-2.5 rounded bg-zinc-900 border border-white/[0.06] text-zinc-300 space-y-1">
+                                <strong className="text-emerald-400 block">AI Output Response Payload:</strong>
+                                <p className="font-mono text-emerald-300 leading-relaxed whitespace-pre-wrap">{log.responseSnippet}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* Modal: Deep Agent Details, Post Queue & Schedule Inspector */}
       {deepAgentDetails &&

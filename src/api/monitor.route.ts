@@ -3,6 +3,7 @@ import { prisma } from '../database/client';
 import { AgentRepository } from '../database/repositories/agent-repository';
 import { autonomousWorker } from '../agents/autonomous-worker';
 import { MemoryService } from '../memory/memory-service';
+import { aiTelemetry } from '../ai/ai-telemetry';
 import { logger } from '../utils/logger';
 
 /**
@@ -101,16 +102,11 @@ export async function handleAgentDetails(req: Request, res: Response) {
     const recentPosts = await prisma.post.findMany({
       where: { agentId: id },
       orderBy: { createdAt: 'desc' },
-      take: 15,
-      include: { topic: true, sources: true },
+      take: 10,
+      include: { topic: true },
     });
 
-    let persona = {};
-    try {
-      persona = JSON.parse(agent.personaConfig);
-    } catch (e) {}
-
-    // Find highest-scoring approved topic queued as next up for publication
+    // Query single highest-scoring topic approved for next publication
     const nextUpTopic = await prisma.topic.findFirst({
       where: {
         agentId: id,
@@ -118,6 +114,11 @@ export async function handleAgentDetails(req: Request, res: Response) {
       },
       orderBy: { score: 'desc' },
     });
+
+    let persona = {};
+    try {
+      persona = JSON.parse(agent.personaConfig);
+    } catch (e) {}
 
     return res.status(200).json({
       agent: {
@@ -147,24 +148,25 @@ export async function handleAgentDetails(req: Request, res: Response) {
       })),
       recentPosts: recentPosts.map((p) => ({
         id: p.id,
-        title: p.topic.title,
+        title: p.topic?.title || 'Published Technical Post',
         text: p.text,
         rationale: p.rationale,
         createdAt: p.createdAt.toISOString(),
       })),
       workerSchedule: {
         intervalMinutes: 5,
-        status: agent.status === 'active' ? 'Active (Every 5 mins)' : 'Paused',
+        status: agent.status === 'active' ? 'Running every 5m' : 'Paused',
       },
     });
   } catch (err) {
-    logger.error('Error in /api/monitor/agent/details', {}, err);
+    logger.error('Error fetching agent details', {}, err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
 
 /**
- * GET /api/monitor/activity?limit=50
+ * GET /api/monitor/activity
+ * Returns recent activity log (editorial decisions & publications).
  */
 export async function handleMonitorActivity(req: Request, res: Response) {
   try {
@@ -175,62 +177,34 @@ export async function handleMonitorActivity(req: Request, res: Response) {
       take: limit,
       include: {
         topic: {
-          include: {
-            agent: true,
-          },
+          include: { agent: true },
         },
       },
     });
 
-    const posts = await prisma.post.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      include: {
-        agent: true,
-        topic: true,
-      },
+    const activity = decisions.map((d) => {
+      let scoresObj: any = {};
+      try {
+        scoresObj = JSON.parse(d.scores);
+      } catch (e) {}
+
+      let persona = {};
+      try {
+        if (d.topic.agent.personaConfig) persona = JSON.parse(d.topic.agent.personaConfig);
+      } catch (e) {}
+
+      return {
+        type: d.decision === 'publish' ? 'topic_selected' : 'topic_rejected',
+        agentId: d.topic.agentId,
+        agentName: (persona as any).name || d.topic.agent.name,
+        title: d.topic.title,
+        score: scoresObj.weightedEditorialScore || d.topic.score,
+        reason: d.reason,
+        timestamp: d.createdAt.toISOString(),
+      };
     });
 
-    const activity: Array<{
-      type: string;
-      agentId: string;
-      agentName: string;
-      title: string;
-      score: number | null;
-      reason?: string;
-      timestamp: string;
-    }> = [];
-
-    for (const post of posts) {
-      let persona: any = {};
-      try { persona = JSON.parse(post.agent.personaConfig); } catch (e) {}
-      activity.push({
-        type: 'post_published',
-        agentId: post.agentId,
-        agentName: persona.name || post.agent.name,
-        title: post.topic.title,
-        score: post.topic.score,
-        timestamp: post.createdAt.toISOString(),
-      });
-    }
-
-    for (const decision of decisions) {
-      let persona: any = {};
-      try { persona = JSON.parse(decision.topic.agent.personaConfig); } catch (e) {}
-      activity.push({
-        type: decision.decision === 'publish' ? 'topic_selected' : 'topic_rejected',
-        agentId: decision.topic.agentId,
-        agentName: persona.name || decision.topic.agent.name,
-        title: decision.topic.title,
-        score: decision.topic.score,
-        reason: decision.reason,
-        timestamp: decision.createdAt.toISOString(),
-      });
-    }
-
-    activity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-    return res.status(200).json({ activity: activity.slice(0, limit) });
+    return res.status(200).json({ activity });
   } catch (err) {
     logger.error('Error in /api/monitor/activity', {}, err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -238,7 +212,8 @@ export async function handleMonitorActivity(req: Request, res: Response) {
 }
 
 /**
- * GET /api/monitor/posts?limit=20
+ * GET /api/monitor/posts
+ * Returns recent published posts across all agents.
  */
 export async function handleMonitorPosts(req: Request, res: Response) {
   try {
@@ -254,25 +229,44 @@ export async function handleMonitorPosts(req: Request, res: Response) {
       },
     });
 
-    const formattedPosts = posts.map((post) => {
-      let persona: any = {};
-      try { persona = JSON.parse(post.agent.personaConfig); } catch (e) {}
+    const formattedPosts = posts.map((p) => {
+      let persona = {};
+      try {
+        if (p.agent.personaConfig) persona = JSON.parse(p.agent.personaConfig);
+      } catch (e) {}
+
       return {
-        id: post.id,
-        agentId: post.agentId,
-        agentName: persona.name || post.agent.name,
-        agentDomain: persona.domain || post.agent.domain,
-        text: post.text,
-        rationale: post.rationale,
-        topicTitle: post.topic.title,
-        sources: post.sources.map((s) => s.url),
-        createdAt: post.createdAt.toISOString(),
+        id: p.id,
+        agentId: p.agentId,
+        agentName: (persona as any).name || p.agent.name,
+        agentDomain: (persona as any).domain || p.agent.domain,
+        text: p.text,
+        rationale: p.rationale,
+        topicTitle: p.topic.title,
+        sources: p.sources.map((s) => s.url),
+        createdAt: p.createdAt.toISOString(),
       };
     });
 
     return res.status(200).json({ posts: formattedPosts });
   } catch (err) {
     logger.error('Error in /api/monitor/posts', {}, err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+/**
+ * GET /api/monitor/ai-logs
+ * Returns live AI usage call telemetry logs & token statistics.
+ */
+export async function handleAiLogs(req: Request, res: Response) {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const logs = aiTelemetry.getLogs(limit);
+    const stats = aiTelemetry.getStats();
+    return res.status(200).json({ logs, stats });
+  } catch (err) {
+    logger.error('Error in /api/monitor/ai-logs', {}, err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
@@ -314,6 +308,10 @@ export async function handleAgentResume(req: Request, res: Response) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
+
+/**
+ * DELETE /api/monitor/agent/:id
+ */
 export async function handleAgentDelete(req: Request, res: Response) {
   try {
     const id = req.params.id as string;

@@ -11,6 +11,7 @@ import {
   handleAgentDetails,
   handleMonitorActivity,
   handleMonitorPosts,
+  handleAiLogs,
   handleAgentPause,
   handleAgentResume,
   handleAgentDelete,
@@ -53,6 +54,7 @@ app.get('/api/monitor/overview', handleMonitorOverview);
 app.get('/api/monitor/agent/:id/details', handleAgentDetails);
 app.get('/api/monitor/activity', handleMonitorActivity);
 app.get('/api/monitor/posts', handleMonitorPosts);
+app.get('/api/monitor/ai-logs', handleAiLogs);
 app.post('/api/monitor/agent/:id/pause', handleAgentPause);
 app.post('/api/monitor/agent/:id/resume', handleAgentResume);
 app.delete('/api/monitor/agent/:id', handleAgentDelete);
