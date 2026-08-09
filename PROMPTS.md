@@ -1,7 +1,15 @@
 # ABTalks Autonomous AI Creator — Complete Prompt & Development Trajectory (PROMPTS.md)
 
 > **Vibe-Coding Verification Document**  
-> This file contains the complete chronological record of user prompts, design specifications, architectural directives, and iteration logs used to build, debug, and harden the **Autonomous AI Creator System**.
+> This file contains the complete chronological record of user prompts, design specifications, architectural directives, exported chat transcripts, and repository links used to build, debug, and harden the **Autonomous AI Creator System**.
+
+---
+
+## 🔗 Project Links & Exported Chat Transcripts
+
+- **Full Project GitHub Repository**: [https://github.com/harshtiwari47/abtalks-auto-agent](https://github.com/harshtiwari47/abtalks-auto-agent)
+- **Exported ChatGPT Vibe-Coding Session 1**: [https://chatgpt.com/share/6a788817-314c-83ee-8fa9-788f169c8a8e](https://chatgpt.com/share/6a788817-314c-83ee-8fa9-788f169c8a8e)
+- **Exported ChatGPT Vibe-Coding Session 2**: [https://chatgpt.com/share/6a788829-e248-83ee-bca3-78e1a6ca5a9f](https://chatgpt.com/share/6a788829-e248-83ee-bca3-78e1a6ca5a9f)
 
 ---
 
@@ -120,8 +128,11 @@ Requirements:
 
 ## 🔒 Verification & Build Sign-Off
 
-- **Codebase Repository**: `git@github.com:harshtiwari47/abtalks-auto-agent.git`
+- **Codebase Repository**: [https://github.com/harshtiwari47/abtalks-auto-agent](https://github.com/harshtiwari47/abtalks-auto-agent)
+- **ChatGPT Exported Transcripts**:
+  - [Session 1 Share Link](https://chatgpt.com/share/6a788817-314c-83ee-8fa9-788f169c8a8e)
+  - [Session 2 Share Link](https://chatgpt.com/share/6a788829-e248-83ee-bca3-78e1a6ca5a9f)
 - **TypeScript Compilation**: Clean (`0 errors`) via `npx tsc --noEmit`.
-- **Vite Build**: Production bundle generated in `4.46s`.
+- **Vite Build**: Production bundle generated in `4.04s`.
 - **Live Command Center**: Running on `http://localhost:3000/`.
 - **Vibe Coding Status**: **100% Prompt-Driven, Autonomous & Hardened**.
