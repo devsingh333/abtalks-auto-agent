@@ -43,4 +43,8 @@ export class MemoryService {
       .map((m) => `-[${m.category.toUpperCase()}] ${m.createdAt}: ${m.content}`)
       .join('\n');
   }
+
+  static async purgeAgentMemory(agentId: string): Promise<void> {
+    await breethClient.purgeAgentMemory(agentId);
+  }
 }

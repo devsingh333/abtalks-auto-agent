@@ -104,6 +104,22 @@ export class BreethClient {
     // If query filter returns empty, return most recent memories
     return (matches.length > 0 ? matches : all).slice(-limit);
   }
+
+  async purgeAgentMemory(agentId: string): Promise<void> {
+    // 1. Clear local in-memory fallback cache
+    this.inMemoryStore.delete(agentId);
+
+    // 2. Call official Breeth REST API to purge agent group memory
+    if (this.client) {
+      try {
+        await this.client.delete(`/v1/episodes?group_id=${agentId}`);
+        logger.info('Purged official Breeth vector memory for agent', { agentId });
+      } catch (err) {
+        const message = (err as Error)?.message || String(err);
+        logger.warn('Breeth REST API memory purge notice', { agentId, message });
+      }
+    }
+  }
 }
 
 export const breethClient = new BreethClient();

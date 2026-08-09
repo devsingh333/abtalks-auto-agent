@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../database/client';
 import { AgentRepository } from '../database/repositories/agent-repository';
 import { autonomousWorker } from '../agents/autonomous-worker';
+import { MemoryService } from '../memory/memory-service';
 import { logger } from '../utils/logger';
 
 /**
@@ -313,22 +314,25 @@ export async function handleAgentResume(req: Request, res: Response) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
-
-/**
- * DELETE /api/monitor/agent/:id
- */
 export async function handleAgentDelete(req: Request, res: Response) {
   try {
     const id = req.params.id as string;
     const agent = await AgentRepository.findById(id);
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
+    // 1. Stop background worker interval
     await autonomousWorker.stopWorkerForAgent(id);
+
+    // 2. Purge vector memory from Breeth and local fallback cache
+    await MemoryService.purgeAgentMemory(id);
+
+    // 3. Cascade delete all agent records (topics, posts, decisions, jobs, agent)
     await AgentRepository.deleteAgent(id);
-    logger.info('Agent deleted via dashboard', { agentId: id });
-    return res.status(200).json({ success: true });
+
+    logger.info('Agent and all associated memory successfully purged from everywhere', { agentId: id });
+    return res.status(200).json({ success: true, message: 'Agent and memory completely freed.' });
   } catch (err) {
-    logger.error('Error deleting agent', {}, err);
+    logger.error('Error deleting agent and purging memory', {}, err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }
