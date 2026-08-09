@@ -22,6 +22,9 @@ import {
 
 export const app = express();
 
+// Trust Railway, Cloudflare, and reverse proxy load balancer headers for rate limiting
+app.set('trust proxy', 1);
+
 // Public Permissive CORS Configuration for Open Third-Party API Access
 app.use(
   cors({
