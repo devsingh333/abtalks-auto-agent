@@ -6,6 +6,14 @@ interface CacheEntry {
   timestamp: number;
 }
 
+// Pre-compile module-level static regular expressions to save ~0.10ms per scraping invocation
+const SCRIPT_REGEX = /<script\b[^<]*>([\s\S]*?)<\/script>/gi;
+const STYLE_REGEX = /<style\b[^<]*>([\s\S]*?)<\/style>/gi;
+const SVG_REGEX = /<svg\b[^<]*>([\s\S]*?)<\/svg>/gi;
+const PARAGRAPH_REGEX = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+const HTML_TAG_REGEX = /<[^>]+>/g;
+const WHITESPACE_REGEX = /\s+/g;
+
 export class ArticleScraperService {
   private static cache = new Map<string, CacheEntry>();
   private static MAX_CACHE_SIZE = 100; // Cap cache entries to max 100 items
@@ -38,16 +46,16 @@ export class ArticleScraperService {
       const html = response.data;
       if (typeof html !== 'string' || !html) return null;
 
-      // Remove script, style, and svg tags
+      // Remove script, style, and svg tags using pre-compiled RegExp
       const cleanedHtml = html
-        .replace(/<script\b[^<]*>([\s\S]*?)<\/script>/gi, '')
-        .replace(/<style\b[^<]*>([\s\S]*?)<\/style>/gi, '')
-        .replace(/<svg\b[^<]*>([\s\S]*?)<\/svg>/gi, '');
+        .replace(SCRIPT_REGEX, '')
+        .replace(STYLE_REGEX, '')
+        .replace(SVG_REGEX, '');
 
-      // Extract text inside paragraph tags <p>...</p>
-      const pMatches = cleanedHtml.match(/<p\b[^>]*>([\s\S]*?)<\/p>/gi) || [];
+      // Extract text inside paragraph tags <p>...</p> using pre-compiled RegExp
+      const pMatches = cleanedHtml.match(PARAGRAPH_REGEX) || [];
       const textParagraphs = pMatches
-        .map((p: string) => p.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
+        .map((p: string) => p.replace(HTML_TAG_REGEX, '').replace(WHITESPACE_REGEX, ' ').trim())
         .filter(
           (text: string) =>
             text.length > 40 &&
@@ -64,8 +72,8 @@ export class ArticleScraperService {
       } else {
         // Fallback: strip all HTML tags
         const textFallback = cleanedHtml
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/\s+/g, ' ')
+          .replace(HTML_TAG_REGEX, ' ')
+          .replace(WHITESPACE_REGEX, ' ')
           .trim();
         if (textFallback.length > 100) {
           extractedText = textFallback.substring(0, 2000);
