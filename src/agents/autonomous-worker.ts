@@ -51,6 +51,33 @@ export class AutonomousWorker {
     logger.info('Stopped autonomous worker loop for agent', { agentId });
   }
 
+  /**
+   * Zero-Post Fast-Track Publishing Safeguard.
+   * If an agent has 0 published posts and has approved topics in queue, instantly triggers publication.
+   */
+  async triggerInstantPublishIfZeroPosts(agentId: string): Promise<boolean> {
+    const postCount = await prisma.post.count({ where: { agentId } });
+    if (postCount > 0) return false;
+
+    let approved = await TopicRepository.getSelectedTopics(agentId);
+    if (approved.length === 0) return false;
+
+    logger.info('⚡ Zero published posts detected with approved topics in queue — fast-tracking immediate post publication', {
+      agentId,
+      approvedCount: approved.length,
+    });
+
+    approved.sort((a, b) => (b.score || 0) - (a.score || 0));
+    const targetTopic = approved[0];
+
+    const agent = await AgentRepository.findById(agentId);
+    if (!agent) return false;
+
+    const decisionReason = `Fast-track zero post initialization: Selected top approved topic with score ${targetTopic.score}`;
+    const post = await this.postService.generateAndPublishPost(agent, targetTopic, decisionReason);
+    return post !== null;
+  }
+
   async executeCycle(agentId: string) {
     const cycleId = `cycle_${Date.now()}`;
     logger.info('Autonomous cycle started', { cycleId, agentId });
@@ -61,6 +88,9 @@ export class AutonomousWorker {
         logger.info('Agent inactive or not found', { cycleId, agentId });
         return;
       }
+
+      // Check if zero posts exist and approved topics are already in queue
+      await this.triggerInstantPublishIfZeroPosts(agent.id);
 
       // Step 1: Production Research Funnel Discovery
       const discoveredCount = await this.discoveryService.runDiscoveryForAgent(agent.id);
@@ -80,6 +110,13 @@ export class AutonomousWorker {
       const canPublish = await this.checkPublishingCooldown(agent.id);
       if (canPublish) {
         let approved = await TopicRepository.getSelectedTopics(agent.id);
+
+        if (approved.length === 0) {
+          const calibrated = await this.editorialEngine.calibrateSecondPass(agent);
+          if (calibrated) {
+            approved = await TopicRepository.getSelectedTopics(agent.id);
+          }
+        }
 
         if (approved.length > 0) {
           approved.sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -144,6 +181,9 @@ export class AutonomousWorker {
         logger.info('Publishing skipped due to active cooldown or max daily post limits', { cycleId, agentId });
       }
 
+      // Final Check: If published post count was 0 at start and we now have approved topics, publish immediately
+      await this.triggerInstantPublishIfZeroPosts(agent.id);
+
       logger.info('Autonomous cycle completed successfully', { cycleId, agentId });
     } catch (err) {
       logger.error('Error in autonomous worker cycle execution', { cycleId, agentId }, err);
@@ -171,7 +211,7 @@ export class AutonomousWorker {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!lastPost) return true;
+    if (!lastPost) return true; // Zero published posts = Instant Cooldown Pass
 
     const diffMs = Date.now() - lastPost.createdAt.getTime();
     const diffMinutes = diffMs / (1000 * 60);
