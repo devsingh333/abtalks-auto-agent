@@ -36,6 +36,8 @@ import {
   Code,
   Terminal,
   Key,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface AgentStats {
@@ -392,6 +394,7 @@ export default function App() {
   const [adminKey, setAdminKey] = useState<string>(() => localStorage.getItem('abtalks_admin_key') || '');
   const [showAdminKeyModal, setShowAdminKeyModal] = useState<boolean>(false);
   const [adminKeyInput, setAdminKeyInput] = useState<string>('');
+  const [showPasswordText, setShowPasswordText] = useState<boolean>(false);
   const [pendingAction, setPendingAction] = useState<{ agentId: string; action: 'pause' | 'resume' | 'trigger' | 'delete' } | null>(null);
 
   const handleAgentAction = async (agentId: string, action: 'pause' | 'resume' | 'trigger' | 'delete', overrideKey?: string) => {
@@ -1584,6 +1587,103 @@ export default function App() {
                   )}
                 </div>
               </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* Modal: Admin Password / Key Prompt */}
+      {showAdminKeyModal &&
+        ReactDOM.createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowAdminKeyModal(false);
+            }}
+          >
+            <div
+              className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-md w-full p-5 shadow-2xl space-y-4 relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+                <div className="flex items-center gap-2 text-xs font-semibold text-amber-400">
+                  <ShieldCheck className="w-4 h-4 text-amber-400" />
+                  <span>Admin Password Required</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdminKeyModal(false)}
+                  className="text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSaveAdminKey();
+                }}
+                className="space-y-3.5 text-xs text-zinc-300"
+              >
+                <p className="leading-relaxed">
+                  An admin password (<code className="text-amber-300 font-mono">ADMIN_API_KEY</code>) is set on the server. Please enter your password to pause, resume, trigger, or delete agents:
+                </p>
+
+                <div className="relative">
+                  <input
+                    type={showPasswordText ? 'text' : 'password'}
+                    value={adminKeyInput}
+                    onChange={(e) => setAdminKeyInput(e.target.value)}
+                    placeholder="Enter ADMIN_API_KEY password..."
+                    className="w-full pl-3 pr-10 py-2.5 rounded-lg bg-zinc-950 border border-amber-500/30 text-zinc-100 font-mono text-xs focus:outline-none focus:border-amber-400 shadow-inner"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordText(!showPasswordText)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 transition-colors"
+                    title={showPasswordText ? 'Hide password' : 'Show password'}
+                  >
+                    {showPasswordText ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  {adminKey ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAdminKey('');
+                        setAdminKeyInput('');
+                        localStorage.removeItem('abtalks_admin_key');
+                        addToast('Admin key cleared from browser', 'info');
+                      }}
+                      className="text-[11px] text-red-400 hover:text-red-300 font-mono underline"
+                    >
+                      Clear Password
+                    </button>
+                  ) : (
+                    <span className="text-[10px] text-zinc-500 font-mono">Saved in browser session</span>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminKeyModal(false)}
+                      className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-zinc-950 font-semibold text-xs transition-colors shadow-sm"
+                    >
+                      Save & Continue
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           </div>,
           document.body
