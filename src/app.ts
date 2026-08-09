@@ -21,8 +21,20 @@ import {
 
 export const app = express();
 
-app.use(cors());
-app.use(express.json());
+// Public Permissive CORS Configuration for Open Third-Party API Access
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    credentials: false,
+  })
+);
+
+// Preflight CORS handler for all routes
+app.options('*', cors());
+
+app.use(express.json({ limit: '2mb' }));
 
 // Global Rate Limiting for all API routes
 app.use('/api/', globalApiLimiter);
@@ -68,7 +80,30 @@ app.post('/api/monitor/agent/:id/trigger', cycleTriggerLimiter, handleAgentTrigg
 app.use(express.static(path.join(__dirname, '..', 'monitor')));
 app.use('/monitor', express.static(path.join(__dirname, '..', 'monitor')));
 
-// 404 handler
-app.use((req, res) => {
+// 404 Not Found Handler
+app.use((req: Request, res: Response) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
+});
+
+// Global Express Error Handling Middleware
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  logger.error('Unhandled API Error in Express middleware pipeline', {
+    path: req.path,
+    method: req.method,
+    error: err?.message || String(err),
+    stack: err?.stack,
+  });
+
+  // Handle Bad JSON syntax errors from body-parser
+  if (err instanceof SyntaxError && 'status' in err && (err as any).status === 400) {
+    return res.status(400).json({ error: 'Malformed JSON payload in request body' });
+  }
+
+  const statusCode = typeof err?.status === 'number' ? err.status : typeof err?.statusCode === 'number' ? err.statusCode : 500;
+  const errorMessage = err?.message || 'An unexpected internal server error occurred';
+
+  return res.status(statusCode).json({
+    error: errorMessage,
+    timestamp: new Date().toISOString(),
+  });
 });

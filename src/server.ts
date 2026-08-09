@@ -5,6 +5,15 @@ import { AgentRepository } from './database/repositories/agent-repository';
 import { JobRepository } from './database/repositories/job-repository';
 import { autonomousWorker } from './agents/autonomous-worker';
 
+// Process-level Global Error Handlers to prevent uncaught crashes
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Promise Rejection caught at process level', { reason: String(reason) });
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception caught at process level', { error: err.message, stack: err.stack });
+});
+
 async function bootstrap() {
   const server = app.listen(env.PORT, async () => {
     logger.info(`Autonomous AI Persona server listening on port ${env.PORT}`, { env: env.NODE_ENV });
