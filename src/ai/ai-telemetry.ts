@@ -28,13 +28,26 @@ export interface AiUsageStats {
 
 class AITelemetryService {
   private logs: AiLogEntry[] = [];
-  private maxLogs = 100;
+  private maxLogs = 50; // Cap log ring buffer size to 50 entries
+  private maxCharLimit = 4000; // Cap prompt/response memory footprint to 4,000 chars per entry
 
   recordLog(entry: Omit<AiLogEntry, 'id' | 'timestamp'>): AiLogEntry {
+    const boundedFullPrompt =
+      entry.fullPrompt.length > this.maxCharLimit
+        ? `${entry.fullPrompt.substring(0, this.maxCharLimit)}\n... [Truncated for memory protection (${entry.fullPrompt.length} total chars)]`
+        : entry.fullPrompt;
+
+    const boundedFullResponse =
+      entry.fullResponse.length > this.maxCharLimit
+        ? `${entry.fullResponse.substring(0, this.maxCharLimit)}\n... [Truncated for memory protection (${entry.fullResponse.length} total chars)]`
+        : entry.fullResponse;
+
     const log: AiLogEntry = {
       id: Math.random().toString(36).substring(2, 9),
       timestamp: new Date().toISOString(),
       ...entry,
+      fullPrompt: boundedFullPrompt,
+      fullResponse: boundedFullResponse,
     };
 
     this.logs.unshift(log);

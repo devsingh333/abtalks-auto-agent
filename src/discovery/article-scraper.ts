@@ -1,14 +1,26 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
 
+interface CacheEntry {
+  content: string;
+  timestamp: number;
+}
+
 export class ArticleScraperService {
-  private static cache = new Map<string, string>();
+  private static cache = new Map<string, CacheEntry>();
+  private static MAX_CACHE_SIZE = 100; // Cap cache entries to max 100 items
+  private static CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour TTL
 
   static async fetchArticleContent(url: string): Promise<string | null> {
     if (!url || !url.startsWith('http')) return null;
 
-    if (this.cache.has(url)) {
-      return this.cache.get(url)!;
+    // 1. Check cache with TTL eviction
+    const existing = this.cache.get(url);
+    if (existing) {
+      if (Date.now() - existing.timestamp < this.CACHE_TTL_MS) {
+        return existing.content;
+      }
+      this.cache.delete(url);
     }
 
     try {
@@ -61,7 +73,13 @@ export class ArticleScraperService {
       }
 
       if (extractedText) {
-        this.cache.set(url, extractedText);
+        // LRU eviction if cache size exceeds limit
+        if (this.cache.size >= this.MAX_CACHE_SIZE) {
+          const oldestKey = this.cache.keys().next().value;
+          if (oldestKey) this.cache.delete(oldestKey);
+        }
+
+        this.cache.set(url, { content: extractedText, timestamp: Date.now() });
         logger.info('Successfully scraped full article content from URL', { url, length: extractedText.length });
         return extractedText;
       }

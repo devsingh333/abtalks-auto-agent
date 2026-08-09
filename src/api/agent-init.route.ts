@@ -6,22 +6,22 @@ import { ORIGINAL_AI_PERSONAS } from '../agents/persona-presets';
 import { logger } from '../utils/logger';
 
 const initSchema = z.object({
-  presetKey: z.string().optional(),
+  presetKey: z.string().max(50).optional(),
   persona: z
     .object({
-      name: z.string().min(1, 'Persona name is required'),
-      role: z.string().optional(),
-      domain: z.string().min(1, 'Persona domain is required'),
-      identity: z.string().optional(),
-      interests: z.array(z.string()).optional(),
-      avoid: z.array(z.string()).optional(),
-      editorialPrinciples: z.array(z.string()).optional(),
+      name: z.string().min(1, 'Persona name is required').max(100, 'Name must be at most 100 characters'),
+      role: z.string().max(150, 'Role must be at most 150 characters').optional(),
+      domain: z.string().min(1, 'Persona domain is required').max(100, 'Domain must be at most 100 characters'),
+      identity: z.string().max(1000, 'Identity text must be at most 1000 characters').optional(),
+      interests: z.array(z.string().max(100)).max(20, 'At most 20 interests allowed').optional(),
+      avoid: z.array(z.string().max(100)).max(20, 'At most 20 avoid topics allowed').optional(),
+      editorialPrinciples: z.array(z.string().max(150)).max(15, 'At most 15 editorial principles allowed').optional(),
       voice: z
         .object({
-          tone: z.string().optional(),
-          length: z.string().optional(),
-          style: z.string().optional(),
-          stance: z.string().optional(),
+          tone: z.string().max(100).optional(),
+          length: z.string().max(100).optional(),
+          style: z.string().max(100).optional(),
+          stance: z.string().max(150).optional(),
         })
         .optional(),
     })
@@ -76,8 +76,8 @@ export async function handleInitAgent(req: Request, res: Response) {
     }
 
     return res.status(200).json(result);
-  } catch (err) {
+  } catch (err: any) {
     logger.error('Error handling /api/agent/init endpoint', {}, err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(400).json({ error: err.message || 'Internal server error' });
   }
 }
