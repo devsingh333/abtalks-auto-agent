@@ -31,9 +31,6 @@ app.use(
   })
 );
 
-// Preflight CORS handler for all routes
-app.options('*', cors());
-
 app.use(express.json({ limit: '2mb' }));
 
 // Global Rate Limiting for all API routes
