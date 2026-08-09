@@ -615,6 +615,23 @@ export default function App() {
               {mobileSearchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
             </button>
 
+            {/* Admin Key Lock Config Button */}
+            <button
+              onClick={() => {
+                setAdminKeyInput(adminKey);
+                setShowAdminKeyModal(true);
+              }}
+              className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-colors flex items-center gap-1.5 ${
+                adminKey
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
+                  : 'bg-zinc-900/80 border-white/[0.08] text-zinc-400 hover:text-zinc-200'
+              }`}
+              title="Configure Admin Password (ADMIN_API_KEY)"
+            >
+              <Key className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden md:inline">{adminKey ? 'Admin Key Active' : 'Admin Key'}</span>
+            </button>
+
             {/* Refresh Button */}
             <button
               onClick={handleManualRefresh}
