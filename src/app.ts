@@ -4,6 +4,7 @@ import cors from 'cors';
 import { env } from './config/env';
 import { logger } from './utils/logger';
 import { globalApiLimiter, agentInitLimiter, cycleTriggerLimiter } from './middleware/rate-limiter';
+import { adminAuthMiddleware } from './middleware/admin-auth';
 import { handleInitAgent } from './api/agent-init.route';
 import { handleGetAgentFeed } from './api/agent-feed.route';
 import { handleHealth } from './api/health.route';
@@ -68,10 +69,10 @@ app.get('/api/monitor/agent/:id/details', handleAgentDetails);
 app.get('/api/monitor/activity', handleMonitorActivity);
 app.get('/api/monitor/posts', handleMonitorPosts);
 app.get('/api/monitor/ai-logs', handleAiLogs);
-app.post('/api/monitor/agent/:id/pause', handleAgentPause);
-app.post('/api/monitor/agent/:id/resume', handleAgentResume);
-app.delete('/api/monitor/agent/:id', handleAgentDelete);
-app.post('/api/monitor/agent/:id/trigger', cycleTriggerLimiter, handleAgentTriggerCycle);
+app.post('/api/monitor/agent/:id/pause', adminAuthMiddleware, handleAgentPause);
+app.post('/api/monitor/agent/:id/resume', adminAuthMiddleware, handleAgentResume);
+app.delete('/api/monitor/agent/:id', adminAuthMiddleware, handleAgentDelete);
+app.post('/api/monitor/agent/:id/trigger', cycleTriggerLimiter, adminAuthMiddleware, handleAgentTriggerCycle);
 
 // Serve dashboard static files on root / and /monitor
 app.use(express.static(path.join(__dirname, '..', 'monitor')));

@@ -388,8 +388,14 @@ export default function App() {
     addToast('Dashboard data refreshed', 'info');
   };
 
-  const handleAgentAction = async (agentId: string, action: 'pause' | 'resume' | 'trigger' | 'delete') => {
+  const [adminKey, setAdminKey] = useState<string>(() => localStorage.getItem('abtalks_admin_key') || '');
+  const [showAdminKeyModal, setShowAdminKeyModal] = useState<boolean>(false);
+  const [adminKeyInput, setAdminKeyInput] = useState<string>('');
+  const [pendingAction, setPendingAction] = useState<{ agentId: string; action: 'pause' | 'resume' | 'trigger' | 'delete' } | null>(null);
+
+  const handleAgentAction = async (agentId: string, action: 'pause' | 'resume' | 'trigger' | 'delete', overrideKey?: string) => {
     const key = `${agentId}-${action}`;
+    const effectiveAdminKey = overrideKey !== undefined ? overrideKey : adminKey;
     setActionLoading((prev) => ({ ...prev, [key]: true }));
 
     try {
@@ -400,9 +406,19 @@ export default function App() {
         method = 'DELETE';
       }
 
-      const res = await fetch(endpoint, { method });
+      const headers: Record<string, string> = {
+        'x-admin-key': effectiveAdminKey,
+      };
+
+      const res = await fetch(endpoint, { method, headers });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          setPendingAction({ agentId, action });
+          setAdminKeyInput(effectiveAdminKey);
+          setShowAdminKeyModal(true);
+          throw new Error('Admin password required. Please enter your ADMIN_API_KEY.');
+        }
         throw new Error(errData.error || `Action ${action} failed`);
       }
 
@@ -425,6 +441,20 @@ export default function App() {
       addToast(err.message || `Failed to execute ${action}`, 'error');
     } finally {
       setActionLoading((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleSaveAdminKey = () => {
+    const trimmed = adminKeyInput.trim();
+    setAdminKey(trimmed);
+    localStorage.setItem('abtalks_admin_key', trimmed);
+    setShowAdminKeyModal(false);
+    addToast('Admin key saved in session', 'success');
+
+    if (pendingAction) {
+      const { agentId, action } = pendingAction;
+      setPendingAction(null);
+      handleAgentAction(agentId, action, trimmed);
     }
   };
 

@@ -14,6 +14,7 @@ const envSchema = z.object({
   NVIDIA_MODEL: z.string().default('nvidia/nemotron-3-ultra-550b-a55b'),
   BREETH_API_KEY: z.string().optional().default(''),
   BREETH_BASE_URL: z.string().default('https://api.breeth.ai'),
+  ADMIN_API_KEY: z.string().optional().default(''),
   AGENT_DISCOVERY_INTERVAL_MINUTES: z.coerce.number().default(5),
   AGENT_MIN_PUBLISH_INTERVAL_MINUTES: z.coerce.number().default(0),
   AGENT_MAX_POSTS_PER_DAY: z.coerce.number().default(100),
