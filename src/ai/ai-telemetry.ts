@@ -1,3 +1,7 @@
+import fs from 'fs';
+import path from 'path';
+import { logger } from '../utils/logger';
+
 export interface AiLogEntry {
   id: string;
   timestamp: string;
@@ -30,6 +34,44 @@ class AITelemetryService {
   private logs: AiLogEntry[] = [];
   private maxLogs = 50; // Cap log ring buffer size to 50 entries
   private maxCharLimit = 4000; // Cap prompt/response memory footprint to 4,000 chars per entry
+  private filePath: string;
+
+  constructor() {
+    const dataDir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dataDir)) {
+      try {
+        fs.mkdirSync(dataDir, { recursive: true });
+      } catch (e) {
+        // ignore directory exists error
+      }
+    }
+    this.filePath = path.join(dataDir, 'ai_telemetry_logs.json');
+    this.loadLogsFromDisk();
+  }
+
+  private loadLogsFromDisk() {
+    try {
+      if (fs.existsSync(this.filePath)) {
+        const raw = fs.readFileSync(this.filePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          this.logs = parsed.slice(0, this.maxLogs);
+          logger.info(`Restored ${this.logs.length} AI telemetry log(s) from persistent disk storage`);
+        }
+      }
+    } catch (err) {
+      logger.warn('Failed to load AI telemetry logs from disk storage', { error: String(err) });
+      this.logs = [];
+    }
+  }
+
+  private async persistLogsToDisk() {
+    try {
+      await fs.promises.writeFile(this.filePath, JSON.stringify(this.logs, null, 2), 'utf-8');
+    } catch (err) {
+      logger.warn('Failed to persist AI telemetry logs to disk', { error: String(err) });
+    }
+  }
 
   recordLog(entry: Omit<AiLogEntry, 'id' | 'timestamp'>): AiLogEntry {
     const boundedFullPrompt =
@@ -54,6 +96,9 @@ class AITelemetryService {
     if (this.logs.length > this.maxLogs) {
       this.logs = this.logs.slice(0, this.maxLogs);
     }
+
+    // Persist asynchronously to disk
+    this.persistLogsToDisk().catch(() => {});
 
     return log;
   }
