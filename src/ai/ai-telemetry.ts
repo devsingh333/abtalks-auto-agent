@@ -12,6 +12,8 @@ export interface AiLogEntry {
   agentName?: string;
   promptSnippet: string;
   responseSnippet: string;
+  fullPrompt: string;
+  fullResponse: string;
   error?: string;
 }
 

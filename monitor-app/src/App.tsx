@@ -1063,14 +1063,41 @@ export default function App() {
                           </button>
 
                           {isExpanded && (
-                            <div className="mt-2 space-y-2 text-[10px] animate-fade-in">
-                              <div className="p-2.5 rounded bg-zinc-900 border border-white/[0.06] text-zinc-300 space-y-1">
-                                <strong className="text-purple-400 block">Prompt Payload Snippet:</strong>
-                                <p className="font-mono text-zinc-400 leading-relaxed whitespace-pre-wrap">{log.promptSnippet}</p>
+                            <div className="mt-2 space-y-3 text-[10px] animate-fade-in">
+                              <div className="p-3 rounded-lg bg-zinc-900 border border-white/[0.08] text-zinc-300 space-y-1.5">
+                                <div className="flex items-center justify-between text-purple-400 font-semibold">
+                                  <span>Full Prompt Payload ({ (log.fullPrompt || log.promptSnippet).length } characters):</span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(log.fullPrompt || log.promptSnippet);
+                                      addToast('Prompt copied to clipboard', 'info');
+                                    }}
+                                    className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors text-[10px]"
+                                  >
+                                    Copy Full Prompt
+                                  </button>
+                                </div>
+                                <div className="max-h-72 overflow-y-auto font-mono text-[11px] leading-relaxed text-zinc-300 whitespace-pre-wrap select-all bg-zinc-950 p-3 rounded-md border border-white/[0.04]">
+                                  {log.fullPrompt || log.promptSnippet}
+                                </div>
                               </div>
-                              <div className="p-2.5 rounded bg-zinc-900 border border-white/[0.06] text-zinc-300 space-y-1">
-                                <strong className="text-emerald-400 block">AI Output Response Payload:</strong>
-                                <p className="font-mono text-emerald-300 leading-relaxed whitespace-pre-wrap">{log.responseSnippet}</p>
+
+                              <div className="p-3 rounded-lg bg-zinc-900 border border-white/[0.08] text-zinc-300 space-y-1.5">
+                                <div className="flex items-center justify-between text-emerald-400 font-semibold">
+                                  <span>AI Output Response JSON:</span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(log.fullResponse || log.responseSnippet);
+                                      addToast('Response copied to clipboard', 'info');
+                                    }}
+                                    className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors text-[10px]"
+                                  >
+                                    Copy Response JSON
+                                  </button>
+                                </div>
+                                <div className="max-h-72 overflow-y-auto font-mono text-[11px] leading-relaxed text-emerald-300 whitespace-pre-wrap select-all bg-zinc-950 p-3 rounded-md border border-white/[0.04]">
+                                  {log.fullResponse || log.responseSnippet}
+                                </div>
                               </div>
                             </div>
                           )}

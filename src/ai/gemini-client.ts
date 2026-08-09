@@ -131,8 +131,10 @@ export class GeminiClient {
           latencyMs,
           status: 'success',
           agentId,
-          promptSnippet: prompt.substring(0, 250),
-          responseSnippet: content.substring(0, 250),
+          promptSnippet: prompt.substring(0, 300),
+          responseSnippet: content.substring(0, 300),
+          fullPrompt: prompt,
+          fullResponse: content,
         });
 
         return parsed;
@@ -172,8 +174,10 @@ export class GeminiClient {
           latencyMs,
           status: 'success',
           agentId,
-          promptSnippet: prompt.substring(0, 250),
-          responseSnippet: text.substring(0, 250),
+          promptSnippet: prompt.substring(0, 300),
+          responseSnippet: text.substring(0, 300),
+          fullPrompt: prompt,
+          fullResponse: text,
         });
 
         return parsed;
@@ -186,6 +190,7 @@ export class GeminiClient {
     logger.info('Using heuristic fallback generator for structured JSON', { agentId, purpose });
     const latencyMs = Date.now() - startTime;
     const fallbackResult = fallbackGenerator();
+    const fallbackStr = JSON.stringify(fallbackResult, null, 2);
 
     aiTelemetry.recordLog({
       model: 'Heuristic Fallback',
@@ -196,8 +201,10 @@ export class GeminiClient {
       latencyMs,
       status: 'fallback',
       agentId,
-      promptSnippet: prompt.substring(0, 250),
-      responseSnippet: JSON.stringify(fallbackResult).substring(0, 250),
+      promptSnippet: prompt.substring(0, 300),
+      responseSnippet: fallbackStr.substring(0, 300),
+      fullPrompt: prompt,
+      fullResponse: fallbackStr,
     });
 
     return fallbackResult;
