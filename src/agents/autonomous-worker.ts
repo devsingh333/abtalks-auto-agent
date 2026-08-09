@@ -15,6 +15,7 @@ export interface AgentWorkerSchedule {
   status: 'active' | 'paused';
   lastRunAt: string | null;
   nextRunAt: string | null;
+  stage: 'idle' | 'discovering' | 'evaluating' | 'publishing';
   isRunning: boolean;
 }
 
@@ -24,7 +25,10 @@ export class AutonomousWorker {
   private postService = new PostService();
   private activeWorkers = new Set<string>();
   private intervals = new Map<string, NodeJS.Timeout>();
-  private scheduleMap = new Map<string, { lastRunAt: string; nextRunAt: string; isRunning: boolean }>();
+  private scheduleMap = new Map<
+    string,
+    { lastRunAt: string; nextRunAt: string; stage: 'idle' | 'discovering' | 'evaluating' | 'publishing'; isRunning: boolean }
+  >();
 
   getWorkerSchedule(agentId: string): AgentWorkerSchedule {
     const sched = this.scheduleMap.get(agentId);
@@ -37,6 +41,7 @@ export class AutonomousWorker {
         status: isActive ? 'active' : 'paused',
         lastRunAt: null,
         nextRunAt: null,
+        stage: 'idle',
         isRunning: false,
       };
     }
@@ -46,8 +51,28 @@ export class AutonomousWorker {
       status: isActive ? 'active' : 'paused',
       lastRunAt: sched.lastRunAt,
       nextRunAt: sched.nextRunAt,
+      stage: sched.stage,
       isRunning: sched.isRunning,
     };
+  }
+
+  private updateStage(
+    agentId: string,
+    stage: 'idle' | 'discovering' | 'evaluating' | 'publishing',
+    isRunning: boolean,
+    lastRunAt?: string,
+    nextRunAt?: string
+  ) {
+    const existing = this.scheduleMap.get(agentId);
+    const now = new Date();
+    const intervalMs = Math.max(1, env.AGENT_DISCOVERY_INTERVAL_MINUTES) * 60 * 1000;
+
+    this.scheduleMap.set(agentId, {
+      lastRunAt: lastRunAt || existing?.lastRunAt || now.toISOString(),
+      nextRunAt: nextRunAt || existing?.nextRunAt || new Date(now.getTime() + intervalMs).toISOString(),
+      stage,
+      isRunning,
+    });
   }
 
   startWorkerForAgent(agentId: string) {
@@ -58,34 +83,31 @@ export class AutonomousWorker {
 
     const intervalMs = Math.max(1, env.AGENT_DISCOVERY_INTERVAL_MINUTES) * 60 * 1000;
     const now = new Date();
-    const nextRun = new Date(now.getTime() + intervalMs);
+    const existing = this.scheduleMap.get(agentId);
 
     this.activeWorkers.add(agentId);
+
+    // Only run initial cycle if no cycle has run yet
+    const shouldRunInitial = !existing || !existing.lastRunAt;
+
+    const nextRun = new Date(now.getTime() + intervalMs);
     this.scheduleMap.set(agentId, {
-      lastRunAt: now.toISOString(),
+      lastRunAt: existing?.lastRunAt || now.toISOString(),
       nextRunAt: nextRun.toISOString(),
+      stage: 'idle',
       isRunning: false,
     });
 
-    logger.info('Starting autonomous worker loop for agent', { agentId });
+    logger.info('Starting autonomous worker loop for agent', { agentId, shouldRunInitial });
 
-    // Initial immediate execution cycle
-    this.executeCycle(agentId).catch((err) => {
-      logger.error('Error in initial autonomous worker cycle', { agentId }, err);
-    });
-
-    // Schedule recurring discovery & publishing loops
-    const timer = setInterval(() => {
-      const cycleNow = new Date();
-      const cycleNext = new Date(cycleNow.getTime() + intervalMs);
-
-      const existing = this.scheduleMap.get(agentId);
-      this.scheduleMap.set(agentId, {
-        lastRunAt: cycleNow.toISOString(),
-        nextRunAt: cycleNext.toISOString(),
-        isRunning: existing?.isRunning || false,
+    if (shouldRunInitial) {
+      this.executeCycle(agentId).catch((err) => {
+        logger.error('Error in initial autonomous worker cycle', { agentId }, err);
       });
+    }
 
+    // Schedule recurring 5-minute discovery & publishing loops
+    const timer = setInterval(() => {
       this.executeCycle(agentId).catch((err) => {
         logger.error('Error in recurring autonomous worker cycle', { agentId }, err);
       });
@@ -103,7 +125,7 @@ export class AutonomousWorker {
     }
     const sched = this.scheduleMap.get(agentId);
     if (sched) {
-      this.scheduleMap.set(agentId, { ...sched, isRunning: false });
+      this.scheduleMap.set(agentId, { ...sched, stage: 'idle', isRunning: false });
     }
     logger.info('Stopped autonomous worker loop for agent', { agentId });
   }
@@ -130,6 +152,7 @@ export class AutonomousWorker {
     const agent = await AgentRepository.findById(agentId);
     if (!agent) return false;
 
+    this.updateStage(agentId, 'publishing', true);
     const decisionReason = `Fast-track zero post initialization: Selected top approved topic with score ${targetTopic.score}`;
     const post = await this.postService.generateAndPublishPost(agent, targetTopic, decisionReason);
     return post !== null;
@@ -137,16 +160,11 @@ export class AutonomousWorker {
 
   async executeCycle(agentId: string) {
     const cycleId = `cycle_${Date.now()}`;
-    const existingSched = this.scheduleMap.get(agentId);
     const intervalMs = Math.max(1, env.AGENT_DISCOVERY_INTERVAL_MINUTES) * 60 * 1000;
     const now = new Date();
+    const nextRun = new Date(now.getTime() + intervalMs);
 
-    this.scheduleMap.set(agentId, {
-      lastRunAt: existingSched?.lastRunAt || now.toISOString(),
-      nextRunAt: existingSched?.nextRunAt || new Date(now.getTime() + intervalMs).toISOString(),
-      isRunning: true,
-    });
-
+    this.updateStage(agentId, 'discovering', true, now.toISOString(), nextRun.toISOString());
     logger.info('Autonomous cycle started', { cycleId, agentId });
 
     try {
@@ -160,12 +178,14 @@ export class AutonomousWorker {
       await this.triggerInstantPublishIfZeroPosts(agent.id);
 
       // Step 1: Production Research Funnel Discovery
+      this.updateStage(agentId, 'discovering', true);
       const discoveredCount = await this.discoveryService.runDiscoveryForAgent(agent.id);
       logger.info('Discovery stage completed', { cycleId, agentId, discoveredCount });
 
       // Step 2: Parallel Concurrent Editorial Evaluation (Concurrency: 4)
       const pendingTopics = await TopicRepository.getPendingTopics(agent.id, 10);
       if (pendingTopics.length > 0) {
+        this.updateStage(agentId, 'evaluating', true);
         logger.info('Evaluating pending topics concurrently in parallel', { count: pendingTopics.length });
 
         const batchSize = 4;
@@ -202,6 +222,7 @@ export class AutonomousWorker {
       }
 
       if (selectedTopics.length > 0) {
+        this.updateStage(agentId, 'publishing', true);
         selectedTopics.sort((a, b) => (b.score || 0) - (a.score || 0));
         const targetTopic = selectedTopics[0];
 
@@ -215,7 +236,7 @@ export class AutonomousWorker {
 
           const similarityCheck = await geminiClient.generateStructuredJson<EventSimilarityResult>(
             prompt,
-            () => ({ isDuplicate: false, similarityScore: 0, matchedTitle: null, reason: 'Fallback pass' }),
+            () => ({ isDuplicate: false, similarityScore: 0, duplicateOfTitle: undefined, reason: 'Fallback pass' }),
             agent.id
           );
 
@@ -240,10 +261,7 @@ export class AutonomousWorker {
     } catch (err) {
       logger.error('Unhandled error during autonomous worker cycle', { cycleId, agentId }, err);
     } finally {
-      const endSched = this.scheduleMap.get(agentId);
-      if (endSched) {
-        this.scheduleMap.set(agentId, { ...endSched, isRunning: false });
-      }
+      this.updateStage(agentId, 'idle', false);
     }
   }
 

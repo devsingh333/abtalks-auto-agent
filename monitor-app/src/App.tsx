@@ -218,12 +218,34 @@ function WorkerCountdownTimer({ schedule, nextUpTitle }: { schedule?: WorkerSche
   }
 
   if (schedule.isRunning) {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-500/20 text-emerald-300 font-mono text-[11px] font-semibold border border-emerald-500/30 shadow-sm animate-pulse">
-        <Zap className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/40" />
-        <span>Publishing Article & Generating Output...</span>
-      </span>
-    );
+    const stage = schedule.stage || 'discovering';
+
+    if (stage === 'discovering') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-indigo-500/20 text-indigo-300 font-mono text-[11px] font-semibold border border-indigo-500/30 shadow-sm animate-pulse">
+          <Compass className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+          <span>Searching Live RSS & Tech Feeds...</span>
+        </span>
+      );
+    }
+
+    if (stage === 'evaluating') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-purple-500/20 text-purple-300 font-mono text-[11px] font-semibold border border-purple-500/30 shadow-sm animate-pulse">
+          <ShieldCheck className="w-3.5 h-3.5 text-purple-400 animate-bounce" />
+          <span>Editorial Judge Scoring Candidate Stories...</span>
+        </span>
+      );
+    }
+
+    if (stage === 'publishing') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-500/20 text-emerald-300 font-mono text-[11px] font-semibold border border-emerald-500/30 shadow-sm animate-pulse">
+          <Zap className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/40" />
+          <span>Writing & Publishing Approved Article...</span>
+        </span>
+      );
+    }
   }
 
   if (!schedule.nextRunAt) {
