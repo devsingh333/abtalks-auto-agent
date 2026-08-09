@@ -25,6 +25,9 @@ import {
   Info,
   HelpCircle,
   BookOpen,
+  Compass,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 interface AgentStats {
@@ -96,6 +99,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [mobileSearchOpen, setMobileSearchOpen] = useState<boolean>(false);
   const [showGuide, setShowGuide] = useState<boolean>(false);
+  const [showControlsHelp, setShowControlsHelp] = useState<boolean>(false);
+  const [copiedAgentId, setCopiedAgentId] = useState<string | null>(null);
   const [expandedReasonIdx, setExpandedReasonIdx] = useState<number | null>(null);
   const [activityFilter, setActivityFilter] = useState<'all' | 'topic_selected' | 'topic_rejected'>('all');
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -138,11 +143,23 @@ export default function App() {
     }
   };
 
+  const handleManualRefresh = async () => {
+    await fetchData();
+    addToast('Dashboard data refreshed', 'success');
+  };
+
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleCopyAgentId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedAgentId(id);
+    addToast(`Copied Agent ID to clipboard`, 'success');
+    setTimeout(() => setCopiedAgentId(null), 2500);
+  };
 
   const handleAgentAction = async (agentId: string, action: 'pause' | 'resume' | 'trigger' | 'delete') => {
     const key = `${agentId}-${action}`;
@@ -160,9 +177,9 @@ export default function App() {
       }
 
       const actionLabels = {
-        pause: 'Agent paused',
-        resume: 'Agent resumed',
-        trigger: 'Manual cycle triggered',
+        pause: 'Agent background loop paused',
+        resume: 'Agent background loop resumed',
+        trigger: 'Immediate cycle triggered',
         delete: 'Agent deleted',
       };
       addToast(actionLabels[action], 'success');
@@ -304,11 +321,11 @@ export default function App() {
               {mobileSearchOpen ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
             </button>
 
-            {/* Refresh Button */}
+            {/* Refresh Button with Active Toast Feedback */}
             <button
-              onClick={fetchData}
+              onClick={handleManualRefresh}
               className="p-2 rounded-lg bg-zinc-900 border border-white/[0.06] hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors shrink-0"
-              title="Refresh Data Now"
+              title="Refresh Dashboard Data"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-zinc-200' : ''}`} />
             </button>
@@ -390,7 +407,7 @@ export default function App() {
           </div>
         )}
 
-        {/* System Metrics Grid with Generous Spacing */}
+        {/* System Metrics Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
           <div className="p-4 sm:p-5 rounded-xl border border-white/[0.06] bg-white/[0.01] space-y-1">
             <div className="text-xs font-medium text-zinc-500">Active Fleet</div>
@@ -429,15 +446,38 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Left Column (2/3 width): Fleet & Outputs */}
           <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-            {/* Agent Fleet Section with Scrollable View */}
+            {/* Agent Fleet Operations */}
             <section className="space-y-4">
               <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-zinc-200">
                   <Bot className="w-4 h-4 text-zinc-400" />
                   <span>Agent Fleet Operations</span>
+                  <button
+                    onClick={() => setShowControlsHelp(!showControlsHelp)}
+                    className="text-zinc-500 hover:text-zinc-300 ml-1 transition-colors"
+                    title="What do Pause & Trigger controls do?"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 <span className="text-xs text-zinc-500 font-mono">{overview?.agents.length || 0} active</span>
               </div>
+
+              {/* Explanatory Banner for Agent Controls */}
+              {showControlsHelp && (
+                <div className="p-3.5 rounded-lg border border-white/[0.08] bg-zinc-900/90 text-xs text-zinc-300 space-y-2 animate-fade-in">
+                  <div className="font-semibold text-zinc-100 flex items-center justify-between">
+                    <span>Agent Control Action Definitions:</span>
+                    <button onClick={() => setShowControlsHelp(false)} className="text-zinc-500 hover:text-zinc-300">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <ul className="space-y-1.5 text-[11px] text-zinc-400 font-mono">
+                    <li><strong className="text-amber-400">Pause / Resume:</strong> Suspends or restarts the 5-minute background worker loop for this specific agent.</li>
+                    <li><strong className="text-indigo-400">Trigger Cycle:</strong> Manually executes an immediate Discovery → Entity Gate → Breeth Novelty → Editorial → Publishing cycle on-demand without waiting for the timer.</li>
+                  </ul>
+                </div>
+              )}
 
               {!overview?.agents || overview.agents.length === 0 ? (
                 <div className="p-6 rounded-xl border border-white/[0.06] bg-white/[0.01] text-center space-y-3 text-xs text-zinc-500">
@@ -460,11 +500,12 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <div className="max-h-[520px] overflow-y-auto pr-1">
+                <div className="max-h-[540px] overflow-y-auto pr-1">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {overview.agents.map((agent) => {
                       const isPaused = agent.status === 'paused';
                       const stats = agent.stats || {};
+                      const isCopied = copiedAgentId === agent.id;
 
                       return (
                         <div
@@ -487,6 +528,21 @@ export default function App() {
                               </span>
                             </div>
 
+                            {/* View & Copy Agent ID */}
+                            <div className="p-2 rounded bg-zinc-900/60 border border-white/[0.04] flex items-center justify-between text-[11px] font-mono">
+                              <span className="text-zinc-500 truncate" title={agent.id}>
+                                ID: <span className="text-zinc-300">{agent.id.substring(0, 13)}...</span>
+                              </span>
+                              <button
+                                onClick={() => handleCopyAgentId(agent.id)}
+                                className="text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-1 shrink-0 ml-2"
+                                title="Copy Full Agent ID"
+                              >
+                                {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{isCopied ? 'Copied' : 'Copy'}</span>
+                              </button>
+                            </div>
+
                             {/* Pipeline Metrics */}
                             <div className="space-y-1.5 text-xs">
                               <div className="flex justify-between text-zinc-400 font-mono text-[11px]">
@@ -504,42 +560,41 @@ export default function App() {
                                 <span>Approved: {stats.topicsSelected || 0}</span>
                               </div>
                             </div>
-
-                            {/* Breeth Memory Integration */}
-                            <div className="text-[11px] font-mono text-zinc-500 border-t border-white/[0.04] pt-2 flex items-center gap-1.5">
-                              <Database className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                              <span className="truncate">Breeth Novelty Check Active</span>
-                            </div>
                           </div>
 
-                          {/* Responsive Actions */}
+                          {/* Responsive Action Buttons with Clear Action Tooltips */}
                           <div className="flex items-center justify-between pt-3 border-t border-white/[0.04] mt-3 text-xs">
                             <div className="flex items-center gap-2">
                               {isPaused ? (
                                 <button
                                   onClick={() => handleAgentAction(agent.id, 'resume')}
                                   disabled={actionLoading[`${agent.id}-resume`]}
-                                  className="px-3 py-1 rounded-md bg-zinc-900 border border-white/[0.08] text-zinc-300 hover:text-white text-xs transition-colors"
+                                  className="px-3 py-1.5 rounded-md bg-zinc-900 border border-white/[0.08] text-zinc-300 hover:text-white text-xs transition-colors flex items-center gap-1"
+                                  title="Resume 5-min background worker loop"
                                 >
-                                  Resume
+                                  <Play className="w-3 h-3 text-emerald-400" />
+                                  <span>Resume Loop</span>
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => handleAgentAction(agent.id, 'pause')}
                                   disabled={actionLoading[`${agent.id}-pause`]}
-                                  className="px-3 py-1 rounded-md bg-zinc-900 border border-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs transition-colors"
+                                  className="px-3 py-1.5 rounded-md bg-zinc-900 border border-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs transition-colors flex items-center gap-1"
+                                  title="Pause background worker loop"
                                 >
-                                  Pause
+                                  <Pause className="w-3 h-3 text-amber-400" />
+                                  <span>Pause Loop</span>
                                 </button>
                               )}
 
                               <button
                                 onClick={() => handleAgentAction(agent.id, 'trigger')}
                                 disabled={actionLoading[`${agent.id}-trigger`]}
-                                className="px-3 py-1 rounded-md bg-zinc-900 border border-white/[0.08] text-zinc-300 hover:text-white text-xs transition-colors flex items-center gap-1"
+                                className="px-3 py-1.5 rounded-md bg-zinc-900 border border-white/[0.08] text-zinc-300 hover:text-white text-xs transition-colors flex items-center gap-1"
+                                title="Run immediate discovery and publishing cycle now"
                               >
                                 <Zap className="w-3.5 h-3.5 text-amber-400" />
-                                <span>Trigger</span>
+                                <span>Trigger Cycle</span>
                               </button>
                             </div>
 
@@ -547,7 +602,7 @@ export default function App() {
                               onClick={() => handleAgentAction(agent.id, 'delete')}
                               disabled={actionLoading[`${agent.id}-delete`]}
                               className="text-zinc-600 hover:text-red-400 transition-colors p-1"
-                              title="Delete Agent"
+                              title="Delete Agent permanently"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -560,7 +615,7 @@ export default function App() {
               )}
             </section>
 
-            {/* Published Output Stream Section with Scrollable View */}
+            {/* Published Output Stream Section */}
             <section className="space-y-4">
               <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
                 <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-zinc-200">
@@ -613,7 +668,7 @@ export default function App() {
             </section>
           </div>
 
-          {/* Right Column (1/3 width): Editorial Activity Stream with Rejection Reason Toggle */}
+          {/* Right Column (1/3 width): Editorial Stream */}
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
               <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-zinc-200">
