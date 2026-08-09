@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import {
   Bot,
   Activity,
@@ -89,6 +90,10 @@ interface Toast {
   type: 'info' | 'success' | 'error';
 }
 
+/**
+ * Orbix Logo SVG Component
+ */
+
 export default function App() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
@@ -102,6 +107,7 @@ export default function App() {
   const [showControlsHelp, setShowControlsHelp] = useState<boolean>(false);
   const [copiedAgentId, setCopiedAgentId] = useState<string | null>(null);
   const [expandedReasonIdx, setExpandedReasonIdx] = useState<number | null>(null);
+  const [selectedPostDetails, setSelectedPostDetails] = useState<PostItem | null>(null);
   const [activityFilter, setActivityFilter] = useState<'all' | 'topic_selected' | 'topic_rejected'>('all');
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
@@ -274,8 +280,13 @@ export default function App() {
       <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#08080a]/90 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-white/[0.08] flex items-center justify-center text-zinc-100 font-bold text-xs">
-              OA
+            {/* Custom Orbix Logo */}
+            <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-white/[0.08] flex items-center justify-center p-1.5 shadow-inner">
+              <svg viewBox="0 0 24 24" fill="none" className="w-full h-full text-indigo-400 stroke-current stroke-[2]">
+                <circle cx="12" cy="12" r="9" className="opacity-40" />
+                <circle cx="12" cy="12" r="4" fill="currentColor" className="text-emerald-400" />
+                <path d="M12 3v3M12 18v3M3 12h3M18 12h3" strokeLinecap="round" />
+              </svg>
             </div>
             <div className="flex items-center gap-3">
               <h1 className="font-semibold text-sm sm:text-base tracking-tight text-zinc-100">
@@ -560,9 +571,15 @@ export default function App() {
                                 <span>Approved: {stats.topicsSelected || 0}</span>
                               </div>
                             </div>
+
+                            {/* Breeth Memory Role Integration */}
+                            <div className="text-[11px] font-mono text-zinc-500 border-t border-white/[0.04] pt-2 flex items-center gap-1.5">
+                              <Database className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                              <span className="truncate">Breeth Memory: Novelty & Deduplication</span>
+                            </div>
                           </div>
 
-                          {/* Responsive Action Buttons with Clear Action Tooltips */}
+                          {/* Responsive Action Buttons */}
                           <div className="flex items-center justify-between pt-3 border-t border-white/[0.04] mt-3 text-xs">
                             <div className="flex items-center gap-2">
                               {isPaused ? (
@@ -645,7 +662,13 @@ export default function App() {
 
                       <div className="pt-3 border-t border-white/[0.04] flex flex-wrap items-center justify-between text-xs text-zinc-500 font-mono gap-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="truncate max-w-xs sm:max-w-md">Rationale: {post.rationale}</span>
+                          <button
+                            onClick={() => setSelectedPostDetails(post)}
+                            className="text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 font-semibold underline"
+                          >
+                            <Info className="w-3.5 h-3.5" />
+                            <span>View Details & Rationale</span>
+                          </button>
                           <span>•</span>
                           <span className="text-emerald-400 shrink-0">Breeth Verified</span>
                         </div>
@@ -759,6 +782,68 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {/* React Portal Modal for Published Post Rationale & Score Details */}
+      {selectedPostDetails &&
+        ReactDOM.createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative">
+              <button
+                onClick={() => setSelectedPostDetails(null)}
+                className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 border-b border-white/[0.08] pb-3">
+                <FileText className="w-4 h-4 text-indigo-400" />
+                <span>Post Selection Details & Rationale</span>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <span className="text-[11px] text-zinc-500 font-mono block">Agent & Domain:</span>
+                  <span className="font-semibold text-zinc-200">{selectedPostDetails.agentName} ({selectedPostDetails.agentDomain})</span>
+                </div>
+
+                <div>
+                  <span className="text-[11px] text-zinc-500 font-mono block">Original Topic:</span>
+                  <span className="text-zinc-300 font-medium">{selectedPostDetails.topicTitle}</span>
+                </div>
+
+                <div>
+                  <span className="text-[11px] text-zinc-500 font-mono block">Published Post Content:</span>
+                  <p className="mt-1 p-3 rounded bg-zinc-950 border border-white/[0.06] text-zinc-200 leading-relaxed font-sans">
+                    {selectedPostDetails.text}
+                  </p>
+                </div>
+
+                <div>
+                  <span className="text-[11px] text-emerald-400 font-mono font-semibold block">Editorial Selection Rationale:</span>
+                  <p className="mt-1 p-3 rounded bg-emerald-950/30 border border-emerald-800/40 text-emerald-200 leading-relaxed font-mono">
+                    {selectedPostDetails.rationale}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-white/[0.08] text-[11px] font-mono text-zinc-400">
+                  <span>Breeth Memory: Novel Event Verified</span>
+                  {selectedPostDetails.sources && selectedPostDetails.sources.length > 0 && (
+                    <a
+                      href={selectedPostDetails.sources[0]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                    >
+                      <span>Original Link</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

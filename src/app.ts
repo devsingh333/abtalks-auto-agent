@@ -34,7 +34,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Serve monitoring dashboard static files
+// Serve dashboard static files on root / and /monitor
+app.use(express.static(path.join(__dirname, '..', 'monitor')));
 app.use('/monitor', express.static(path.join(__dirname, '..', 'monitor')));
 
 // Routes
