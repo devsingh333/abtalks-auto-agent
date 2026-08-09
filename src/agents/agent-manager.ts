@@ -36,7 +36,7 @@ export class AgentManager {
     // Check if existing agent with same name and domain exists
     const existing = await AgentRepository.findByNameAndDomain(name, domain);
     if (existing) {
-      logger.info('Existing agent found during init call; updating persona & triggering immediate cycle', {
+      logger.info('Existing agent found during init call; re-activating persona & starting worker', {
         agentId: existing.id,
         name,
         domain,
@@ -54,13 +54,16 @@ export class AgentManager {
       // Seed/refresh memory in Breeth
       await MemoryService.seedPersonaMemory(existing.id, personaConfig);
 
-      // Start worker & trigger cycle immediately
+      // Start worker (startWorkerForAgent handles single initial cycle execution safely)
       await autonomousWorker.startWorkerForAgent(existing.id);
-      autonomousWorker.executeCycle(existing.id).catch((err) => {
-        logger.error('Error in initial cycle for existing agent', { agentId: existing.id }, err);
-      });
 
       return { agentId: existing.id };
+    }
+
+    // Enforce System-Wide Agent Quota (Max 10 active agents)
+    const activeCount = await AgentRepository.countActiveAgents();
+    if (activeCount >= 10) {
+      throw new Error('Maximum system-wide active agent quota reached (10). Please delete or pause an agent before initializing a new one.');
     }
 
     // Create new Agent record in database
@@ -69,13 +72,8 @@ export class AgentManager {
     // Seed long-term memory in Breeth
     await MemoryService.seedPersonaMemory(newAgent.id, personaConfig);
 
-    // Start autonomous background worker loop
+    // Start autonomous background worker loop (handles single initial cycle execution safely)
     await autonomousWorker.startWorkerForAgent(newAgent.id);
-
-    // Trigger immediate discovery & publishing cycle fire-and-forget
-    autonomousWorker.executeCycle(newAgent.id).catch((err) => {
-      logger.error('Error in initial cycle for new agent', { agentId: newAgent.id }, err);
-    });
 
     logger.info('Successfully initialized agent and started autonomous worker cycle', {
       agentId: newAgent.id,

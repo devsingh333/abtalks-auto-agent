@@ -3,6 +3,7 @@ import path from 'path';
 import cors from 'cors';
 import { env } from './config/env';
 import { logger } from './utils/logger';
+import { globalApiLimiter, agentInitLimiter, cycleTriggerLimiter } from './middleware/rate-limiter';
 import { handleInitAgent } from './api/agent-init.route';
 import { handleGetAgentFeed } from './api/agent-feed.route';
 import { handleHealth } from './api/health.route';
@@ -22,6 +23,9 @@ export const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Global Rate Limiting for all API routes
+app.use('/api/', globalApiLimiter);
 
 // Endpoint Development Logging Middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -44,8 +48,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Primary API Routes (Mount API routes BEFORE static files)
-app.all('/api/agent/init', handleInitAgent);
+// Primary API Routes
+app.all('/api/agent/init', agentInitLimiter, handleInitAgent);
 app.get('/api/agent/feed', handleGetAgentFeed);
 app.get('/health', handleHealth);
 
@@ -58,7 +62,7 @@ app.get('/api/monitor/ai-logs', handleAiLogs);
 app.post('/api/monitor/agent/:id/pause', handleAgentPause);
 app.post('/api/monitor/agent/:id/resume', handleAgentResume);
 app.delete('/api/monitor/agent/:id', handleAgentDelete);
-app.post('/api/monitor/agent/:id/trigger', handleAgentTriggerCycle);
+app.post('/api/monitor/agent/:id/trigger', cycleTriggerLimiter, handleAgentTriggerCycle);
 
 // Serve dashboard static files on root / and /monitor
 app.use(express.static(path.join(__dirname, '..', 'monitor')));

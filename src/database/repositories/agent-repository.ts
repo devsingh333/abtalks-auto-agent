@@ -47,6 +47,12 @@ export class AgentRepository {
     });
   }
 
+  static async countActiveAgents(): Promise<number> {
+    return prisma.agent.count({
+      where: { status: 'active' },
+    });
+  }
+
   static async listAllAgents(): Promise<Agent[]> {
     return prisma.agent.findMany({
       orderBy: { createdAt: 'asc' },
