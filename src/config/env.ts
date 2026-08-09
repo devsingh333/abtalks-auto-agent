@@ -14,9 +14,9 @@ const envSchema = z.object({
   NVIDIA_MODEL: z.string().default('nvidia/nemotron-3-ultra-550b-a55b'),
   BREETH_API_KEY: z.string().optional().default(''),
   BREETH_BASE_URL: z.string().default('https://api.breeth.ai'),
-  AGENT_DISCOVERY_INTERVAL_MINUTES: z.coerce.number().default(15),
-  AGENT_MIN_PUBLISH_INTERVAL_MINUTES: z.coerce.number().default(120),
-  AGENT_MAX_POSTS_PER_DAY: z.coerce.number().default(6),
+  AGENT_DISCOVERY_INTERVAL_MINUTES: z.coerce.number().default(5),
+  AGENT_MIN_PUBLISH_INTERVAL_MINUTES: z.coerce.number().default(0),
+  AGENT_MAX_POSTS_PER_DAY: z.coerce.number().default(100),
 });
 
 export const env = envSchema.parse(process.env);

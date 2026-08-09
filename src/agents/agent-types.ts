@@ -1,6 +1,7 @@
 export interface InitAgentRequest {
   persona: {
     name: string;
+    role?: string;
     domain: string;
     identity?: string;
     interests?: string[];
@@ -10,6 +11,7 @@ export interface InitAgentRequest {
       tone?: string;
       length?: string;
       style?: string;
+      stance?: string;
     };
   };
 }
