@@ -62,9 +62,20 @@ export class TopicRepository {
     return prisma.topic.findMany({
       where: {
         agentId,
-        status: 'discovered',
+        status: { in: ['discovered', 'pending'] },
       },
       orderBy: { discoveredAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  static async getRecentRejectedTopics(agentId: string, limit: number = 5): Promise<Topic[]> {
+    return prisma.topic.findMany({
+      where: {
+        agentId,
+        status: 'rejected',
+      },
+      orderBy: { score: 'desc' },
       take: limit,
     });
   }

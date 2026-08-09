@@ -434,17 +434,26 @@ export default function App() {
                   disabled={actionLoading.createSample}
                   className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2 disabled:opacity-50"
                 >
-                  <Sparkles className="w-4 h-4" />
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   <span>Create AI Security Agent</span>
                 </button>
 
                 <button
-                  onClick={() => handleCreateSampleAgent('System Security Researcher', 'System Security')}
+                  onClick={() => handleCreateSampleAgent('AI Infrastructure Analyst', 'AI Infrastructure')}
                   disabled={actionLoading.createSample}
                   className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-all flex items-center gap-2 disabled:opacity-50"
                 >
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                  <span>Create System Security Agent</span>
+                  <Cpu className="w-4 h-4 text-indigo-400" />
+                  <span>Create AI Infrastructure Agent</span>
+                </button>
+
+                <button
+                  onClick={() => handleCreateSampleAgent('Machine Learning Engineer', 'Machine Learning')}
+                  disabled={actionLoading.createSample}
+                  className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-xs font-semibold transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                  <span>Create ML Engineer Agent</span>
                 </button>
               </div>
             </div>

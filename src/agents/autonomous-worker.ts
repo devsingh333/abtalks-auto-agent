@@ -75,7 +75,15 @@ export class AutonomousWorker {
       const canPublish = await this.checkPublishingCooldown(agent.id);
       if (canPublish) {
         // Find highest scoring selected topic
-        const approved = await TopicRepository.getSelectedTopics(agent.id);
+        let approved = await TopicRepository.getSelectedTopics(agent.id);
+
+        // Second-Pass Editorial Calibration Safeguard if 0 approved topics exist
+        if (approved.length === 0) {
+          const calibrated = await this.editorialEngine.calibrateSecondPass(agent);
+          if (calibrated) {
+            approved = await TopicRepository.getSelectedTopics(agent.id);
+          }
+        }
 
         if (approved.length > 0) {
           // Sort by score descending
@@ -90,7 +98,6 @@ export class AutonomousWorker {
             totalSelected: approved.length,
           });
 
-          // Fetch decision rationale
           const decisionReason = `Selected topic with editorial score ${targetTopic.score}`;
           await this.postService.generateAndPublishPost(agent, targetTopic, decisionReason);
         } else {
@@ -100,11 +107,19 @@ export class AutonomousWorker {
         logger.info('Publishing skipped due to active cooldown or max daily post limits', { cycleId, agentId });
       }
 
-      await WorkerLock.release(lock.id, true);
-      logger.info('Autonomous cycle completed successfully', { cycleId, agentId });
+      try {
+        await WorkerLock.release(lock.id, true);
+        logger.info('Autonomous cycle completed successfully', { cycleId, agentId });
+      } catch (lockErr) {
+        logger.warn('Cycle succeeded but worker lock release encountered a warning', { cycleId, agentId, lockErr });
+      }
     } catch (err) {
       logger.error('Autonomous cycle encountered an error', { cycleId, agentId }, err);
-      await WorkerLock.release(lock.id, false, err instanceof Error ? err.message : String(err));
+      try {
+        await WorkerLock.release(lock.id, false, err instanceof Error ? err.message : String(err));
+      } catch {
+        // Ignore secondary lock error
+      }
     }
   }
 

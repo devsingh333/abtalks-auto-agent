@@ -8,6 +8,7 @@ export interface EditorialEvaluationResult {
     impact: number;
     timeliness: number;
     sourceQuality: number;
+    originality: number;
     personaFit: number;
   };
   reason: string;
@@ -22,44 +23,53 @@ export function buildEvaluateTopicPrompt(
   relevantMemoryContext: string
 ): string {
   return `
-You are an expert editorial evaluator acting as persona "${persona.name}" in domain "${persona.domain}".
-Persona Identity: ${persona.identity}
-Persona Editorial Principles: ${persona.editorialPrinciples.join('; ')}
-Persona Avoid Topics: ${persona.avoid.join('; ')}
+You are a senior technical news editor evaluating a candidate story for persona "${persona.name}" (Domain: "${persona.domain}").
 
-Candidate Topic to Evaluate:
+EDITORIAL EVALUATION STANDARD:
+Do NOT ask "Is this an unrepeatable once-in-a-decade historic breakthrough?"
+Ask: "Is this development sufficiently interesting, relevant, timely, and useful for an audience following ${persona.domain} to publish today?"
+
+PERSONA DETAILS:
+- Domain: ${persona.domain}
+- Identity: ${persona.identity}
+- Editorial Principles: ${persona.editorialPrinciples ? persona.editorialPrinciples.join('; ') : 'Technical depth, accuracy, relevance'}
+- Topics to Avoid: ${persona.avoid ? persona.avoid.join('; ') : 'None'}
+
+CANDIDATE STORY:
 - Title: ${topic.title}
 - Source: ${topic.sourceName} (${topic.canonicalUrl})
-- Objective Source Quality Rating (1-10): ${sourceQualityScore}
-- Summary/Content Snippet: ${topic.summary || 'N/A'}
+- Objective Source Quality Rating: ${sourceQualityScore}/10
+- Summary: ${topic.summary || 'N/A'}
 
-Relevant Previous Persona Memory & Publications:
-${relevantMemoryContext || 'None found.'}
+RELEVANT MEMORY & PRIOR COVERAGE:
+${relevantMemoryContext || 'No previous coverage of this topic found.'}
 
-Task:
-Evaluate whether this topic should be published or rejected by the persona.
-Rate each dimension from 1 to 10:
-- relevance (fit to persona domain)
-- novelty (is this new vs past memory)
-- impact (technical significance)
-- timeliness (recent development)
-- sourceQuality (credibility)
-- personaFit (aligns with editorial stance)
+EVALUATION CRITERIA (Rate 1.0 to 10.0):
+1. relevance: Is this genuinely about ${persona.domain}? (10 = directly about ${persona.domain}, 1 = completely unrelated)
+2. timeliness: Is this a recent development, announcement, release, or update?
+3. impact: Does this have practical, technical, or community significance?
+4. sourceQuality: Is the source credible?
+5. originality: Does this bring fresh factual information compared to prior memory?
+6. personaFit: Does this fit the tone and domain of ${persona.name}?
 
-Return output strictly as a single JSON object matching this TypeScript format:
+DECISION GUIDELINE:
+- If relevance >= 7.0, timeliness >= 6.0, sourceQuality >= 6.0, and personaFit >= 7.0, set decision to "publish".
+- Otherwise, set decision to "reject" and provide a clear diagnostic reason.
+
+Return output strictly as JSON matching this format:
 {
   "decision": "publish" | "reject",
   "scores": {
-    "relevance": number,
-    "novelty": number,
-    "impact": number,
-    "timeliness": number,
-    "sourceQuality": number,
-    "personaFit": number
+    "relevance": 8.5,
+    "timeliness": 8.0,
+    "impact": 7.0,
+    "sourceQuality": 8.0,
+    "originality": 8.5,
+    "personaFit": 9.0
   },
-  "reason": "Detailed string explaining why selected or rejected over other candidates",
-  "newInformation": "String summarizing what exact new factual development is brought by this item",
-  "riskFlags": string[]
+  "reason": "Clear diagnostic explanation of decision",
+  "newInformation": "Summary of fresh factual development",
+  "riskFlags": []
 }
 `;
 }
