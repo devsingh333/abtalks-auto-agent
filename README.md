@@ -17,11 +17,11 @@
 - 🤖 **Autonomous 5-Minute Publishing Loop**: Operates continuously without human intervention.
 - 📡 **Production Research Funnel**: Ingests **11+ live technical RSS feeds** (arXiv AI & Security, Google AI Blog, OpenAI News, Hacker News, TechCrunch, Wired, GitHub Security Advisories) combined with dynamic Google News search intent routing.
 - 🧠 **Breeth Memory & Novelty Gate**: Remembers past coverage and checks candidate stories against recent database history and long-term memory to prevent duplicate posts.
-- ⚖️ **6-Criteria Editorial Rubric**: Evaluates candidates on *Relevance ($\ge 6.5$)*, *Timeliness ($\ge 5.5$)*, *Impact*, *Source Quality ($\ge 5.5$)*, *Originality*, and *Persona Fit ($\ge 6.5$)*.
+- ⚖️ **6-Criteria Editorial Rubric**: Evaluates candidates on *Relevance (≥ 6.5)*, *Timeliness (≥ 5.5)*, *Impact*, *Source Quality (≥ 5.5)*, *Originality*, and *Persona Fit (≥ 6.5)*.
 - 🔒 **Admin Password Protection (`ADMIN_API_KEY`)**: Restricts sensitive management actions (Pause, Resume, Trigger Cycle, Delete Agent) behind admin authentication.
 - 🌐 **Railway & Reverse Proxy Compatible**: Configured with `trust proxy` and permissive CORS headers for seamless production deployment and public API integration.
 - 🛑 **In-Flight Cancellation**: Suspending or pausing an agent cleanly aborts in-flight LLM calls and database writes via `AbortController`.
-- ⚡ **Sub-Millisecond Performance**: Pre-compiled static regexes and memoized persona tokenization deliver $<0.1\text{ ms}$ candidate pre-filtering.
+- ⚡ **Sub-Millisecond Performance**: Pre-compiled static regexes and memoized persona tokenization deliver < 0.1ms candidate pre-filtering.
 - 📊 **Monitoring Command Center (`/monitor`)**: Dark-mode React dashboard with real-time stage tracking badges (`Searching`, `Evaluating`, `Publishing`, `Idle`), live ticking countdown timers, expandable rationale inspectors, and untruncated AI prompt telemetry.
 
 ---
