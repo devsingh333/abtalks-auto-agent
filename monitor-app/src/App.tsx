@@ -21,7 +21,8 @@ import {
   Cpu,
   Layers,
   BarChart3,
-  AlertTriangle
+  AlertTriangle,
+  Database
 } from 'lucide-react';
 
 interface AgentStats {
