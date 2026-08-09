@@ -1,6 +1,5 @@
 import { Agent, Topic, Post } from '@prisma/client';
 import { PersonaConfig } from '../database/repositories/agent-repository';
-import { PostRepository } from '../database/repositories/post-repository';
 import { TopicRepository } from '../database/repositories/topic-repository';
 import { MemoryService } from '../memory/memory-service';
 import { geminiClient } from '../ai/gemini-client';
@@ -12,28 +11,40 @@ import { ArticleScraperService } from '../discovery/article-scraper';
 
 export class PostService {
   async generateAndPublishPost(agent: Agent, topic: Topic, editorialReason: string): Promise<Post | null> {
-    // 1. Atomic Guard: Prevent duplicate post generation on the same topic
-    if (topic.status === 'published') {
-      logger.warn('Topic already marked as published, skipping duplicate post generation', { agentId: agent.id, topicId: topic.id });
-      return null;
-    }
-
-    const existingPost = await prisma.post.findUnique({
-      where: { topicId: topic.id },
+    // 1. Atomic Database Claim Lock: Claim topic atomically BEFORE calling expensive LLM generation
+    const claimed = await prisma.topic.updateMany({
+      where: {
+        id: topic.id,
+        status: { in: ['selected', 'evaluated', 'discovered'] },
+      },
+      data: {
+        status: 'generating',
+      },
     });
 
-    if (existingPost) {
-      logger.warn('Post for this topic already exists in database, skipping duplicate creation', { agentId: agent.id, topicId: topic.id });
-      await TopicRepository.updateStatus(topic.id, 'published');
-      return existingPost;
+    if (claimed.count === 0) {
+      logger.warn('Topic already claimed, generating, or published by another worker cycle; skipping duplicate generation', {
+        agentId: agent.id,
+        topicId: topic.id,
+      });
+
+      // Check if post already exists
+      const existingPost = await prisma.post.findUnique({
+        where: { topicId: topic.id },
+      });
+      return existingPost || null;
     }
 
-    logger.info('Starting post generation and publication', { agentId: agent.id, topicId: topic.id, title: topic.title });
+    logger.info('Claimed topic lock; starting post generation and publication', {
+      agentId: agent.id,
+      topicId: topic.id,
+      title: topic.title,
+    });
 
     const persona: PersonaConfig = JSON.parse(agent.personaConfig);
     const memoryContext = await MemoryService.getRelevantMemoryContext(agent.id, topic.title);
 
-    // 2. Fetch full article body content from publisher / Google News redirect URL
+    // Fetch full article body content from publisher / Google News redirect URL
     const articleContent = await ArticleScraperService.fetchArticleContent(topic.canonicalUrl);
 
     const prompt = buildGeneratePostPrompt(
@@ -65,12 +76,47 @@ export class PostService {
       return null;
     }
 
-    // Save to database atomically
+    // 2. Save post and update topic status to 'published' in a SINGLE atomic database transaction
+    let post: Post;
     try {
-      const post = await PostRepository.createPost(agent.id, topic.id, generated.text, generated.rationale, sources);
-      await TopicRepository.updateStatus(topic.id, 'published');
+      post = await prisma.$transaction(async (tx) => {
+        const createdPost = await tx.post.create({
+          data: {
+            agentId: agent.id,
+            topicId: topic.id,
+            text: generated.text,
+            rationale: generated.rationale,
+            sources: {
+              create: sources.map((url) => ({ url })),
+            },
+          },
+          include: {
+            sources: true,
+            topic: true,
+            agent: true,
+          },
+        });
 
-      // Save published post memory into Breeth memory
+        await tx.topic.update({
+          where: { id: topic.id },
+          data: { status: 'published' },
+        });
+
+        return createdPost;
+      });
+    } catch (err: any) {
+      if (err.code === 'P2002') {
+        logger.warn('Duplicate post creation caught by database unique constraint', { topicId: topic.id });
+        await TopicRepository.updateStatus(topic.id, 'published');
+        const existing = await prisma.post.findUnique({ where: { topicId: topic.id } });
+        return existing || null;
+      }
+      await TopicRepository.updateStatus(topic.id, 'failed');
+      throw err;
+    }
+
+    // 3. Non-blocking side effect: Save published post memory into Breeth memory
+    try {
       await MemoryService.recordPublishedPostMemory(
         agent.id,
         topic.title,
@@ -78,22 +124,21 @@ export class PostService {
         generated.text,
         generated.rationale
       );
-
-      logger.info('Post successfully published and persisted', {
-        postId: post.id,
-        topicId: topic.id,
+    } catch (memErr) {
+      logger.warn('Breeth memory recording failed as side-effect; post remains successfully published in database', {
         agentId: agent.id,
-        title: topic.title,
+        topicId: topic.id,
+        error: memErr,
       });
-
-      return post;
-    } catch (err: any) {
-      if (err.code === 'P2002') {
-        logger.warn('Duplicate post creation caught by database unique constraint', { topicId: topic.id });
-        await TopicRepository.updateStatus(topic.id, 'published');
-        return null;
-      }
-      throw err;
     }
+
+    logger.info('Post successfully published and persisted atomically', {
+      postId: post.id,
+      topicId: topic.id,
+      agentId: agent.id,
+      title: topic.title,
+    });
+
+    return post;
   }
 }
