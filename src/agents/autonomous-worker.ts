@@ -261,7 +261,14 @@ export class AutonomousWorker {
     } catch (err) {
       logger.error('Unhandled error during autonomous worker cycle', { cycleId, agentId }, err);
     } finally {
-      this.updateStage(agentId, 'idle', false);
+      const finishedNow = new Date();
+      const nextRun = new Date(finishedNow.getTime() + intervalMs);
+      this.scheduleMap.set(agentId, {
+        lastRunAt: finishedNow.toISOString(),
+        nextRunAt: nextRun.toISOString(),
+        stage: 'idle',
+        isRunning: false,
+      });
     }
   }
 

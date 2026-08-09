@@ -200,8 +200,9 @@ function OrbixLogo({ className = 'w-5 h-5' }: { className?: string }) {
 }
 
 /** Live Countdown Timer Component for Next Article Publishing */
-function WorkerCountdownTimer({ schedule, nextUpTitle }: { schedule?: WorkerSchedule; nextUpTitle?: string | null }) {
+function WorkerCountdownTimer({ schedule, nextUpTitle, onCycleTriggered }: { schedule?: WorkerSchedule; nextUpTitle?: string | null; onCycleTriggered?: () => void }) {
   const [now, setNow] = useState<number>(Date.now());
+  const [hasTriggeredSync, setHasTriggeredSync] = useState<boolean>(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -248,17 +249,23 @@ function WorkerCountdownTimer({ schedule, nextUpTitle }: { schedule?: WorkerSche
     }
   }
 
-  if (!schedule.nextRunAt) {
+  const targetTime = schedule.nextRunAt ? new Date(schedule.nextRunAt).getTime() : Date.now() + 300000;
+  const diffMs = Math.max(0, targetTime - now);
+
+  if (diffMs <= 0) {
+    if (!hasTriggeredSync && onCycleTriggered) {
+      onCycleTriggered();
+      setHasTriggeredSync(true);
+    }
+
     return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-950 border border-white/[0.08] text-[11px] font-mono text-indigo-300">
-        <Clock className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-        <span>Next Article Publish in <strong className="text-zinc-100 font-semibold">5m 00s</strong></span>
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-500/20 text-emerald-300 font-mono text-[11px] font-semibold border border-emerald-500/30 shadow-sm animate-pulse">
+        <RefreshCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+        <span>Starting Publication Cycle Now...</span>
       </span>
     );
   }
 
-  const targetTime = new Date(schedule.nextRunAt).getTime();
-  const diffMs = Math.max(0, targetTime - now);
   const totalSec = Math.floor(diffMs / 1000);
   const minutes = Math.floor(totalSec / 60);
   const seconds = totalSec % 60;
@@ -835,7 +842,7 @@ export default function App() {
 
                             {/* Live Article Publishing Countdown Timer Badge */}
                             <div className="pt-1">
-                              <WorkerCountdownTimer schedule={agent.schedule} nextUpTitle={agent.nextUpTopicTitle} />
+                              <WorkerCountdownTimer schedule={agent.schedule} nextUpTitle={agent.nextUpTopicTitle} onCycleTriggered={fetchData} />
                             </div>
 
                             {/* Pipeline Metrics */}
