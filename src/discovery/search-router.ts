@@ -6,6 +6,7 @@ import { RssDiscovery } from './rss-discovery';
 import { DiscoveryPlan, SourceStrategy } from './discovery-plan';
 import { EntityRelevanceGate } from './entity-relevance-gate';
 import { isJunkSourceDomain } from '../editorial/source-quality';
+import { LIVE_TECH_SOURCES } from './source-registry';
 
 export interface ProviderExecutionStats {
   providersAttempted: number;
@@ -25,7 +26,7 @@ export class SearchRouter {
 
   /**
    * High-Precision Intent-Driven Search Router.
-   * Uses Google News RSS as the primary high-volume discovery engine.
+   * Uses Google News RSS & Registered Premium RSS Feeds (TechCrunch, Wired, The Verge, BBC, NYT, CNN, NBC, etc.)
    * Filters out junk domains and routes persona-specific queries (arXiv, GitHub, HackerNews, Official RSS).
    */
   async executeDiscoveryPlan(
@@ -40,7 +41,7 @@ export class SearchRouter {
       failedProviderDetails: [],
     };
 
-    // Round 1: Execute intent-routed queries
+    // Round 1: Execute intent-routed queries & fetch registered RSS feeds
     let candidates = await this.runSearchRound(plan, interests, stats);
 
     // Adaptive Search Retry (Round 2) if Round 1 yields 0 candidates
@@ -83,6 +84,25 @@ export class SearchRouter {
     const rawItems: NormalizedTopicItem[] = [];
     const seenUrls = new Set<string>();
 
+    // 1. Fetch from registered RSS feeds (TechCrunch, The Verge, Wired, MIT Tech Review, BBC, NYT, CNN, NBC, etc.)
+    for (const source of LIVE_TECH_SOURCES) {
+      stats.providersAttempted++;
+      try {
+        const feedItems = await this.rssDiscovery.fetchFeed(source);
+        stats.providersSuccessful++;
+        for (const item of feedItems) {
+          if (!isJunkSourceDomain(item.canonicalUrl, item.title) && !seenUrls.has(item.canonicalUrl)) {
+            seenUrls.add(item.canonicalUrl);
+            rawItems.push(item);
+          }
+        }
+      } catch (err: any) {
+        stats.providersFailed++;
+        stats.failedProviderDetails.push(`${source.id}: ${err.message}`);
+      }
+    }
+
+    // 2. Execute intent-routed search queries
     for (const intent of plan.intents) {
       for (const query of intent.queries.slice(0, 2)) {
         for (const strategy of intent.sourceStrategy) {
@@ -92,7 +112,6 @@ export class SearchRouter {
             stats.providersSuccessful++;
 
             for (const item of items) {
-              // 1. Source Quality Pre-Filter: Reject junk/spam domains immediately
               if (isJunkSourceDomain(item.canonicalUrl, item.title)) {
                 logger.debug('Filtered junk source domain before gating', { title: item.title, url: item.canonicalUrl });
                 continue;
@@ -112,7 +131,7 @@ export class SearchRouter {
       }
     }
 
-    // 2. Apply Hard Entity Relevance Gate
+    // 3. Apply Hard Entity Relevance Gate
     const verifiedCandidates: NormalizedTopicItem[] = [];
     for (const item of rawItems) {
       const gateResult = EntityRelevanceGate.verifyRelevance(item, plan.targetEntity, interests);
@@ -148,7 +167,6 @@ export class SearchRouter {
       case 'news':
       case 'general_web':
       default:
-        // Use Google News RSS as the primary, reliable discovery engine
         return this.searchGoogleNews(query);
     }
   }
@@ -164,7 +182,7 @@ export class SearchRouter {
       sourceType: 'tech_news',
     });
 
-    return items.map((i) => ({ ...i, sourceName: 'Google News', sourceType: 'news' }));
+    return items.map((i) => ({ ...i, sourceName: i.sourceName || 'Google News', sourceType: 'news' }));
   }
 
   private async searchGitHub(query: string): Promise<NormalizedTopicItem[]> {
