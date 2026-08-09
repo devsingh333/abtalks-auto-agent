@@ -702,7 +702,7 @@ export default function App() {
                             <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between text-[11px] font-mono">
                               <button
                                 onClick={() => fetchAgentDeepDetails(agent.id)}
-                                className="text-indigo-400 hover:text-indigo-300 font-sans text-xs font-semibold flex items-center gap-1 underline"
+                                className="text-indigo-400 hover:text-indigo-300 font-sans text-xs font-semibold flex items-center gap-1.5 transition-colors"
                               >
                                 <ListOrdered className="w-3.5 h-3.5" />
                                 <span>Inspect Agent & Post Queue • {stats.topicsPending || 0}</span>
@@ -796,7 +796,7 @@ export default function App() {
                         <div className="flex items-center gap-2 min-w-0">
                           <button
                             onClick={() => setSelectedPostDetails(post)}
-                            className="text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 font-semibold underline"
+                            className="text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1 font-semibold"
                           >
                             <Info className="w-3.5 h-3.5" />
                             <span>View Details & Rationale</span>
