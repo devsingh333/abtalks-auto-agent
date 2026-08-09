@@ -8,6 +8,7 @@ import { buildGeneratePostPrompt, GeneratedPostResult } from '../ai/prompts/gene
 import { PostValidator } from './post-validator';
 import { logger } from '../utils/logger';
 import { prisma } from '../database/client';
+import { ArticleScraperService } from '../discovery/article-scraper';
 
 export class PostService {
   async generateAndPublishPost(agent: Agent, topic: Topic, editorialReason: string): Promise<Post | null> {
@@ -32,18 +33,22 @@ export class PostService {
     const persona: PersonaConfig = JSON.parse(agent.personaConfig);
     const memoryContext = await MemoryService.getRelevantMemoryContext(agent.id, topic.title);
 
+    // 2. Fetch full article body content from publisher / Google News redirect URL
+    const articleContent = await ArticleScraperService.fetchArticleContent(topic.canonicalUrl);
+
     const prompt = buildGeneratePostPrompt(
       persona,
       { title: topic.title, canonicalUrl: topic.canonicalUrl, sourceName: topic.sourceName },
       editorialReason,
-      memoryContext
+      memoryContext,
+      articleContent
     );
 
     const generated = await geminiClient.generateStructuredJson<GeneratedPostResult>(
       prompt,
       () => {
         return {
-          text: `Analysis: ${topic.title}. Primary findings disclosed by ${topic.sourceName} highlight key technical developments in ${persona.domain}. Verified source: ${topic.canonicalUrl}`,
+          text: `${topic.title}. Verified findings from ${topic.sourceName} highlight key developments in ${persona.domain}. Full details: ${topic.canonicalUrl}`,
           rationale: `Selected because ${topic.title} represents a primary technical development in ${persona.domain} from ${topic.sourceName}. Chosen over generic announcements due to primary technical evidence.`,
           sourceClaims: [topic.title],
         };
@@ -60,7 +65,7 @@ export class PostService {
       return null;
     }
 
-    // Save to PostgreSQL database atomically
+    // Save to database atomically
     try {
       const post = await PostRepository.createPost(agent.id, topic.id, generated.text, generated.rationale, sources);
       await TopicRepository.updateStatus(topic.id, 'published');
