@@ -19,12 +19,14 @@ export class FreshnessScorer {
   static scoreEvent(event: EventCluster, persona: PersonaConfig, memoryMatchesCount: number = 0): FreshnessScoreResult {
     const titleLower = event.primaryTitle.toLowerCase();
 
-    // 1. Recency Score (0 - 10)
+    // 1. Recency Tier Score
+    // 0-24h: 10.0 (Very Fresh), 24-72h: 8.0 (Fresh), 3-7d: 5.0 (Potentially Relevant), 7d+: 2.0
     const hoursOld = (Date.now() - event.eventDate.getTime()) / (1000 * 60 * 60);
-    let recencyScore = 10;
-    if (hoursOld > 72) recencyScore = 4.0;
-    else if (hoursOld > 24) recencyScore = 7.0;
-    else if (hoursOld > 6) recencyScore = 9.0;
+    let recencyScore = 10.0;
+    if (hoursOld > 168) recencyScore = 2.0;       // > 7 days
+    else if (hoursOld > 72) recencyScore = 5.0;  // 3 - 7 days
+    else if (hoursOld > 24) recencyScore = 8.0;  // 24 - 72 hours
+    else recencyScore = 10.0;                    // 0 - 24 hours
 
     // 2. Source Quality Score (0 - 10)
     let qualityScore = 7.0;
