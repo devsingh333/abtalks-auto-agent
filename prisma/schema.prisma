@@ -51,7 +51,7 @@ model Topic {
 model Post {
   id        String   @id @default(uuid())
   agentId   String
-  topicId   String
+  topicId   String   @unique
   createdAt DateTime @default(now())
   text      String
   rationale String
