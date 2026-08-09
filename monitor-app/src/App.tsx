@@ -35,6 +35,7 @@ import {
   Calendar,
   Code,
   Terminal,
+  Key,
 } from 'lucide-react';
 
 interface AgentStats {
