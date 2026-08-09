@@ -1,5 +1,6 @@
 import { prisma } from '../client';
 import { Topic, EditorialDecision } from '@prisma/client';
+import { PersonaConfig } from './agent-repository';
 
 export interface CreateTopicData {
   agentId: string;
@@ -23,18 +24,20 @@ export class TopicRepository {
           title: data.title,
           sourceName: data.sourceName,
           sourceType: data.sourceType,
-          publishedAt: data.publishedAt,
+          publishedAt: data.publishedAt || new Date(),
           contentHash: data.contentHash,
           status: 'discovered',
         },
       });
-    } catch {
-      // Ignore duplicate insertion error due to unique constraint race condition
-      return null;
+    } catch (err: any) {
+      if (err.code === 'P2002') {
+        return null;
+      }
+      throw err;
     }
   }
 
-  static async findByCanonicalUrlOrHash(agentId: string, canonicalUrl: string, contentHash: string): Promise<Topic | null> {
+  static async findExisting(agentId: string, canonicalUrl: string, contentHash: string): Promise<Topic | null> {
     return prisma.topic.findFirst({
       where: {
         agentId,
@@ -43,46 +46,23 @@ export class TopicRepository {
     });
   }
 
+  static async findByCanonicalUrlOrHash(agentId: string, canonicalUrl: string, contentHash: string): Promise<Topic | null> {
+    return this.findExisting(agentId, canonicalUrl, contentHash);
+  }
+
   /**
-   * Advanced Fuzzy & Semantic Event Overlap Check.
-   * Checks if an event with similar key entities (e.g. Kit Connor + Cyclops) has already been published/selected.
+   * Checks if the exact topic title has already been published/selected for this agent.
    */
-  static async hasTopicBeenCovered(agentId: string, title: string): Promise<boolean> {
-    const recentCovered = await prisma.topic.findMany({
+  static async hasExactTitleBeenCovered(agentId: string, title: string): Promise<boolean> {
+    const existing = await prisma.topic.findFirst({
       where: {
         agentId,
-        status: { in: ['published', 'selected'] },
+        status: { in: ['published', 'selected', 'generating'] },
+        title: { equals: title },
       },
-      select: { title: true },
-      take: 50,
+      select: { id: true },
     });
-
-    const getKeywords = (t: string) =>
-      new Set(
-        t
-          .toLowerCase()
-          .replace(/[^\w\s]/g, '')
-          .split(/\s+/)
-          .filter((w) => w.length > 3 && !['marvel', 'studios', 'news', 'reboot', 'reportedly', 'lands', 'role'].includes(w))
-      );
-
-    const targetKeywords = getKeywords(title);
-    if (targetKeywords.size === 0) return false;
-
-    for (const item of recentCovered) {
-      const existingKeywords = getKeywords(item.title);
-      let matchCount = 0;
-      for (const kw of targetKeywords) {
-        if (existingKeywords.has(kw)) matchCount++;
-      }
-
-      // If 2 or more key specific entities match (e.g. "kit", "connor", "cyclops"), it's the exact same news story!
-      if (matchCount >= 2 || (matchCount >= 1 && targetKeywords.size <= 2)) {
-        return true;
-      }
-    }
-
-    return false;
+    return Boolean(existing);
   }
 
   static async getPendingTopics(agentId: string, limit: number = 10): Promise<Topic[]> {

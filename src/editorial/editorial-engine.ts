@@ -42,8 +42,8 @@ export class EditorialEngine {
       return { topicId: topic.id, decision: 'reject', score: detResult.totalScore, reason };
     }
 
-    // 2. Check semantic novelty against Breeth memory
-    const noveltyResult = await NoveltyChecker.checkNovelty(agent.id, topic.title);
+    // 2. Check semantic novelty against Breeth memory using dynamic persona stop-words
+    const noveltyResult = await NoveltyChecker.checkNovelty(agent.id, topic.title, persona);
     if (!noveltyResult.isNovel) {
       const reason = noveltyResult.reason || 'Duplicate topic in memory';
       await TopicRepository.updateStatus(topic.id, 'rejected', detResult.totalScore);
