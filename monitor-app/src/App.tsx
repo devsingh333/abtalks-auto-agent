@@ -152,6 +152,8 @@ interface AiLogItem {
   agentId?: string;
   promptSnippet: string;
   responseSnippet: string;
+  fullPrompt?: string;
+  fullResponse?: string;
 }
 
 interface AiStats {
@@ -979,133 +981,143 @@ export default function App() {
       {/* Modal: AI Live Usage Telemetry Logs */}
       {showAiLogsModal &&
         ReactDOM.createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-            <div className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-4xl w-full max-h-[88vh] flex flex-col p-6 space-y-4 shadow-2xl relative">
-              <button
-                onClick={() => setShowAiLogsModal(false)}
-                className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 shrink-0">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in"
+            onClick={() => {}} // Backdrop clicks non-closing
+          >
+            <div
+              className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-4xl w-full max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/[0.08] shrink-0 bg-zinc-900/90">
                 <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
                   <Cpu className="w-4 h-4 text-purple-400" />
                   <span>AI Live Usage Stream & Telemetry Logs</span>
                 </div>
-                <button
-                  onClick={fetchAiLogs}
-                  className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-mono text-zinc-300 transition-colors flex items-center gap-1"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>Refresh Logs</span>
-                </button>
-              </div>
-
-              {/* AI Usage Statistics Bar */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-                <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
-                  <span className="text-zinc-500 block text-[10px]">Total AI Calls</span>
-                  <span className="text-lg font-bold text-purple-300">{aiStats?.totalCalls || 0}</span>
-                </div>
-                <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
-                  <span className="text-zinc-500 block text-[10px]">Avg Latency</span>
-                  <span className="text-lg font-bold text-emerald-400">{aiStats?.avgLatencyMs || 0} ms</span>
-                </div>
-                <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
-                  <span className="text-zinc-500 block text-[10px]">Total Tokens Est.</span>
-                  <span className="text-lg font-bold text-amber-300">~{aiStats?.totalTokensEst.toLocaleString() || 0}</span>
-                </div>
-                <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
-                  <span className="text-zinc-500 block text-[10px]">Primary Model</span>
-                  <span className="text-xs font-bold text-indigo-300 truncate block mt-1">Nemotron 550B</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={fetchAiLogs}
+                    className="px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-xs font-mono text-zinc-300 transition-colors flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Refresh Logs</span>
+                  </button>
+                  <button
+                    onClick={() => setShowAiLogsModal(false)}
+                    className="text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
+                    title="Close Modal"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
-              {/* Live Log Stream Table / List */}
-              <div className="overflow-y-auto space-y-3 pr-1 text-xs">
-                {aiLogs.length === 0 ? (
-                  <div className="p-8 text-center text-zinc-500 font-mono">
-                    No AI telemetry logs recorded yet. Cycles will log real-time NVIDIA/Gemini API calls here.
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+                {/* AI Usage Statistics Bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+                  <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
+                    <span className="text-zinc-500 block text-[10px]">Total AI Calls</span>
+                    <span className="text-lg font-bold text-purple-300">{aiStats?.totalCalls || 0}</span>
                   </div>
-                ) : (
-                  aiLogs.map((log) => {
-                    const isExpanded = expandedAiLogId === log.id;
-                    return (
-                      <div key={log.id} className="p-3.5 rounded-lg bg-zinc-950 border border-white/[0.04] space-y-2 font-mono">
-                        <div className="flex items-center justify-between text-[11px]">
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-semibold text-[10px]">
-                              {log.provider}
-                            </span>
-                            <span className="text-zinc-200 font-semibold">{log.purpose}</span>
-                          </div>
-                          <span className="text-zinc-500">{formatTime(log.timestamp)}</span>
-                        </div>
+                  <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
+                    <span className="text-zinc-500 block text-[10px]">Avg Latency</span>
+                    <span className="text-lg font-bold text-emerald-400">{aiStats?.avgLatencyMs || 0} ms</span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
+                    <span className="text-zinc-500 block text-[10px]">Total Tokens Est.</span>
+                    <span className="text-lg font-bold text-amber-300">~{aiStats?.totalTokensEst.toLocaleString() || 0}</span>
+                  </div>
+                  <div className="p-3 rounded-lg bg-zinc-950 border border-white/[0.04]">
+                    <span className="text-zinc-500 block text-[10px]">Primary Model</span>
+                    <span className="text-xs font-bold text-indigo-300 truncate block mt-1">Nemotron 550B</span>
+                  </div>
+                </div>
 
-                        <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-white/[0.03]">
-                          <span>Model: <strong className="text-zinc-200">{log.model}</strong></span>
-                          <span>Latency: <strong className="text-emerald-400">{log.latencyMs}ms</strong></span>
-                          <span>Tokens: <strong className="text-amber-400">~{log.promptTokensEst + log.completionTokensEst}</strong></span>
-                          <span className={log.status === 'success' ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
-                            {log.status.toUpperCase()}
-                          </span>
-                        </div>
-
-                        {/* Expandable Prompt / Response Drawer */}
-                        <div className="pt-1">
-                          <button
-                            onClick={() => setExpandedAiLogId(isExpanded ? null : log.id)}
-                            className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
-                          >
-                            <Terminal className="w-3 h-3" />
-                            <span>{isExpanded ? 'Hide Full Prompt & JSON Response' : 'Inspect Prompt & Response Payload'}</span>
-                          </button>
-
-                          {isExpanded && (
-                            <div className="mt-2 space-y-3 text-[10px] animate-fade-in">
-                              <div className="p-3 rounded-lg bg-zinc-900 border border-white/[0.08] text-zinc-300 space-y-1.5">
-                                <div className="flex items-center justify-between text-purple-400 font-semibold">
-                                  <span>Full Prompt Payload ({ (log.fullPrompt || log.promptSnippet).length } characters):</span>
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(log.fullPrompt || log.promptSnippet);
-                                      addToast('Prompt copied to clipboard', 'info');
-                                    }}
-                                    className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors text-[10px]"
-                                  >
-                                    Copy Full Prompt
-                                  </button>
-                                </div>
-                                <div className="max-h-72 overflow-y-auto font-mono text-[11px] leading-relaxed text-zinc-300 whitespace-pre-wrap select-all bg-zinc-950 p-3 rounded-md border border-white/[0.04]">
-                                  {log.fullPrompt || log.promptSnippet}
-                                </div>
-                              </div>
-
-                              <div className="p-3 rounded-lg bg-zinc-900 border border-white/[0.08] text-zinc-300 space-y-1.5">
-                                <div className="flex items-center justify-between text-emerald-400 font-semibold">
-                                  <span>AI Output Response JSON:</span>
-                                  <button
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(log.fullResponse || log.responseSnippet);
-                                      addToast('Response copied to clipboard', 'info');
-                                    }}
-                                    className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors text-[10px]"
-                                  >
-                                    Copy Response JSON
-                                  </button>
-                                </div>
-                                <div className="max-h-72 overflow-y-auto font-mono text-[11px] leading-relaxed text-emerald-300 whitespace-pre-wrap select-all bg-zinc-950 p-3 rounded-md border border-white/[0.04]">
-                                  {log.fullResponse || log.responseSnippet}
-                                </div>
-                              </div>
+                {/* Live Log Stream Table / List */}
+                <div className="space-y-3 text-xs">
+                  {aiLogs.length === 0 ? (
+                    <div className="p-8 text-center text-zinc-500 font-mono">
+                      No AI telemetry logs recorded yet. Cycles will log real-time NVIDIA/Gemini API calls here.
+                    </div>
+                  ) : (
+                    aiLogs.map((log) => {
+                      const isExpanded = expandedAiLogId === log.id;
+                      return (
+                        <div key={log.id} className="p-3.5 rounded-lg bg-zinc-950 border border-white/[0.04] space-y-2 font-mono">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-semibold text-[10px]">
+                                {log.provider}
+                              </span>
+                              <span className="text-zinc-200 font-semibold">{log.purpose}</span>
                             </div>
-                          )}
+                            <span className="text-zinc-500">{formatTime(log.timestamp)}</span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1 border-t border-white/[0.03]">
+                            <span>Model: <strong className="text-zinc-200">{log.model}</strong></span>
+                            <span>Latency: <strong className="text-emerald-400">{log.latencyMs}ms</strong></span>
+                            <span>Tokens: <strong className="text-amber-400">~{log.promptTokensEst + log.completionTokensEst}</strong></span>
+                            <span className={log.status === 'success' ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
+                              {log.status.toUpperCase()}
+                            </span>
+                          </div>
+
+                          {/* Expandable Prompt / Response Drawer */}
+                          <div className="pt-1">
+                            <button
+                              onClick={() => setExpandedAiLogId(isExpanded ? null : log.id)}
+                              className="text-[10px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors"
+                            >
+                              <Terminal className="w-3 h-3" />
+                              <span>{isExpanded ? 'Hide Full Prompt & JSON Response' : 'Inspect Prompt & Response Payload'}</span>
+                            </button>
+
+                            {isExpanded && (
+                              <div className="mt-2 space-y-3 text-[10px] animate-fade-in">
+                                <div className="p-3 rounded-lg bg-zinc-900 border border-white/[0.08] text-zinc-300 space-y-1.5">
+                                  <div className="flex items-center justify-between text-purple-400 font-semibold">
+                                    <span>Full Prompt Payload ({ (log.fullPrompt || log.promptSnippet).length } characters):</span>
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(log.fullPrompt || log.promptSnippet);
+                                        addToast('Prompt copied to clipboard', 'info');
+                                      }}
+                                      className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors text-[10px]"
+                                    >
+                                      Copy Full Prompt
+                                    </button>
+                                  </div>
+                                  <div className="max-h-72 overflow-y-auto font-mono text-[11px] leading-relaxed text-zinc-300 whitespace-pre-wrap select-all bg-zinc-950 p-3 rounded-md border border-white/[0.04]">
+                                    {log.fullPrompt || log.promptSnippet}
+                                  </div>
+                                </div>
+
+                                <div className="p-3 rounded-lg bg-zinc-900 border border-white/[0.08] text-zinc-300 space-y-1.5">
+                                  <div className="flex items-center justify-between text-emerald-400 font-semibold">
+                                    <span>AI Output Response JSON:</span>
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(log.fullResponse || log.responseSnippet);
+                                        addToast('Response copied to clipboard', 'info');
+                                      }}
+                                      className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors text-[10px]"
+                                    >
+                                      Copy Response JSON
+                                    </button>
+                                  </div>
+                                  <div className="max-h-72 overflow-y-auto font-mono text-[11px] leading-relaxed text-emerald-300 whitespace-pre-wrap select-all bg-zinc-950 p-3 rounded-md border border-white/[0.04]">
+                                    {log.fullResponse || log.responseSnippet}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })
-                )}
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </div>
           </div>,
@@ -1115,24 +1127,32 @@ export default function App() {
       {/* Modal: Deep Agent Details, Post Queue & Schedule Inspector */}
       {deepAgentDetails &&
         ReactDOM.createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-            <div className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-3xl w-full max-h-[85vh] flex flex-col p-6 space-y-4 shadow-2xl relative">
-              <button
-                onClick={() => setDeepAgentDetails(null)}
-                className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 shrink-0">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in"
+            onClick={() => {}} // Backdrop clicks non-closing
+          >
+            <div
+              className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-3xl w-full max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/[0.08] shrink-0 bg-zinc-900/90">
                 <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
                   <OrbixLogo className="w-4 h-4" />
                   <span>Agent Deep Inspection • {deepAgentDetails.agent.name}</span>
                 </div>
-                <span className="text-xs font-mono text-emerald-400 font-medium">{deepAgentDetails.workerSchedule.status}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-emerald-400 font-medium">{deepAgentDetails.workerSchedule.status}</span>
+                  <button
+                    onClick={() => setDeepAgentDetails(null)}
+                    className="text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
+                    title="Close Modal"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
-              <div className="overflow-y-auto space-y-5 pr-1 text-xs">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 text-xs">
                 {/* Schedule & Timing Bar */}
                 <div className="p-3.5 rounded-lg border border-white/[0.06] bg-zinc-950 flex flex-wrap items-center justify-between text-xs font-mono gap-3">
                   <div className="flex items-center gap-2">
@@ -1267,71 +1287,81 @@ export default function App() {
       {/* Modal: Launch New Original Persona Agent */}
       {showNewPersonaModal &&
         ReactDOM.createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-            <div className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative">
-              <button
-                onClick={() => setShowNewPersonaModal(false)}
-                className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100 border-b border-white/[0.08] pb-3">
-                <UserCheck className="w-4 h-4 text-indigo-400" />
-                <span>Launch Original AI & Technology Persona Agent</span>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in"
+            onClick={() => {}} // Backdrop clicks non-closing
+          >
+            <div
+              className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/[0.08] shrink-0 bg-zinc-900/90">
+                <div className="flex items-center gap-2 text-sm font-semibold text-zinc-100">
+                  <UserCheck className="w-4 h-4 text-indigo-400" />
+                  <span>Launch Original AI & Technology Persona Agent</span>
+                </div>
+                <button
+                  onClick={() => setShowNewPersonaModal(false)}
+                  className="text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
+                  title="Close Modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Select an original persona identity to initialize an autonomous research agent with a consistent writing voice, stable technical interests, and distinct editorial stance:
-              </p>
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Select an original persona identity to initialize an autonomous research agent with a consistent writing voice, stable technical interests, and distinct editorial stance:
+                </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div
-                  onClick={() => handleInitPresetAgent('ai_security')}
-                  className="p-4 rounded-lg bg-zinc-950/60 hover:bg-indigo-500/10 cursor-pointer transition-all space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-zinc-100">Dr. Elena Vance</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-medium">AI Security</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div
+                    onClick={() => handleInitPresetAgent('ai_security')}
+                    className="p-4 rounded-lg bg-zinc-950/60 hover:bg-indigo-500/10 cursor-pointer transition-all space-y-2 border border-white/[0.04]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-zinc-100">Dr. Elena Vance</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-medium">AI Security</span>
+                    </div>
+                    <span className="text-xs text-zinc-400 font-mono block">Senior AI Security Researcher</span>
+                    <p className="text-[11px] text-zinc-500 leading-normal">Focuses on LLM prompt injection, adversarial machine learning, model poisoning, and CVE disclosures.</p>
                   </div>
-                  <span className="text-xs text-zinc-400 font-mono block">Senior AI Security Researcher</span>
-                  <p className="text-[11px] text-zinc-500 leading-normal">Focuses on LLM prompt injection, adversarial machine learning, model poisoning, and CVE disclosures.</p>
-                </div>
 
-                <div
-                  onClick={() => handleInitPresetAgent('ml_systems')}
-                  className="p-4 rounded-lg bg-zinc-950/60 hover:bg-emerald-500/10 cursor-pointer transition-all space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-zinc-100">Dr. Maya Lin</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-medium">ML Systems</span>
+                  <div
+                    onClick={() => handleInitPresetAgent('ml_systems')}
+                    className="p-4 rounded-lg bg-zinc-950/60 hover:bg-emerald-500/10 cursor-pointer transition-all space-y-2 border border-white/[0.04]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-zinc-100">Dr. Maya Lin</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-medium">ML Systems</span>
+                    </div>
+                    <span className="text-xs text-zinc-400 font-mono block">ML Systems Architect</span>
+                    <p className="text-[11px] text-zinc-500 leading-normal">Focuses on open weights, vLLM quantization, PyTorch performance, and reproducible ML benchmarks.</p>
                   </div>
-                  <span className="text-xs text-zinc-400 font-mono block">ML Systems Architect</span>
-                  <p className="text-[11px] text-zinc-500 leading-normal">Focuses on open weights, vLLM quantization, PyTorch performance, and reproducible ML benchmarks.</p>
-                </div>
 
-                <div
-                  onClick={() => handleInitPresetAgent('ai_infrastructure')}
-                  className="p-4 rounded-lg bg-zinc-950/60 hover:bg-amber-500/10 cursor-pointer transition-all space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-zinc-100">Marcus Chen</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-medium">AI Infra</span>
+                  <div
+                    onClick={() => handleInitPresetAgent('ai_infrastructure')}
+                    className="p-4 rounded-lg bg-zinc-950/60 hover:bg-amber-500/10 cursor-pointer transition-all space-y-2 border border-white/[0.04]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-zinc-100">Marcus Chen</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-medium">AI Infra</span>
+                    </div>
+                    <span className="text-xs text-zinc-400 font-mono block">AI Infrastructure Analyst</span>
+                    <p className="text-[11px] text-zinc-500 leading-normal">Focuses on GPU clusters, interconnect topologies, distributed training compute scaling, and TCO.</p>
                   </div>
-                  <span className="text-xs text-zinc-400 font-mono block">AI Infrastructure Analyst</span>
-                  <p className="text-[11px] text-zinc-500 leading-normal">Focuses on GPU clusters, interconnect topologies, distributed training compute scaling, and TCO.</p>
-                </div>
 
-                <div
-                  onClick={() => handleInitPresetAgent('robotics_ai')}
-                  className="p-4 rounded-lg bg-zinc-950/60 hover:bg-purple-500/10 cursor-pointer transition-all space-y-2"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-zinc-100">Alex Rivera</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-medium">Robotics</span>
+                  <div
+                    onClick={() => handleInitPresetAgent('robotics_ai')}
+                    className="p-4 rounded-lg bg-zinc-950/60 hover:bg-purple-500/10 cursor-pointer transition-all space-y-2 border border-white/[0.04]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-zinc-100">Alex Rivera</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-medium">Robotics</span>
+                    </div>
+                    <span className="text-xs text-zinc-400 font-mono block">Robotics & Embodied AI Engineer</span>
+                    <p className="text-[11px] text-zinc-500 leading-normal">Focuses on Vision-Language-Action (VLA) models, spatial intelligence, ROS 2, and physical robot deployments.</p>
                   </div>
-                  <span className="text-xs text-zinc-400 font-mono block">Robotics & Embodied AI Engineer</span>
-                  <p className="text-[11px] text-zinc-500 leading-normal">Focuses on Vision-Language-Action (VLA) models, spatial intelligence, ROS 2, and physical robot deployments.</p>
                 </div>
               </div>
             </div>
@@ -1342,21 +1372,29 @@ export default function App() {
       {/* Modal: Published Post Rationale Details */}
       {selectedPostDetails &&
         ReactDOM.createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-            <div className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-xl w-full p-6 space-y-4 shadow-2xl relative">
-              <button
-                onClick={() => setSelectedPostDetails(null)}
-                className="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 border-b border-white/[0.08] pb-3">
-                <FileText className="w-4 h-4 text-indigo-400" />
-                <span>Post Selection Details & Rationale</span>
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-fade-in"
+            onClick={() => {}} // Backdrop clicks non-closing
+          >
+            <div
+              className="bg-zinc-900 border border-white/[0.1] rounded-xl max-w-xl w-full max-h-[85vh] sm:max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/[0.08] shrink-0 bg-zinc-900/90">
+                <div className="flex items-center gap-2 text-xs font-mono text-zinc-400">
+                  <FileText className="w-4 h-4 text-indigo-400" />
+                  <span>Post Selection Details & Rationale</span>
+                </div>
+                <button
+                  onClick={() => setSelectedPostDetails(null)}
+                  className="text-zinc-400 hover:text-white p-1 rounded-md bg-zinc-800/60 transition-colors"
+                  title="Close Modal"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <div className="space-y-3 text-xs">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 text-xs">
                 <div>
                   <span className="text-[11px] text-zinc-500 font-mono block">Agent & Domain:</span>
                   <span className="font-semibold text-zinc-200">{selectedPostDetails.agentName} • {selectedPostDetails.agentDomain}</span>
