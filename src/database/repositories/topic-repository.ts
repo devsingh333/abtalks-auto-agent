@@ -43,19 +43,46 @@ export class TopicRepository {
     });
   }
 
+  /**
+   * Advanced Fuzzy & Semantic Event Overlap Check.
+   * Checks if an event with similar key entities (e.g. Kit Connor + Cyclops) has already been published/selected.
+   */
   static async hasTopicBeenCovered(agentId: string, title: string): Promise<boolean> {
-    const existing = await prisma.topic.findFirst({
+    const recentCovered = await prisma.topic.findMany({
       where: {
         agentId,
-        title: {
-          equals: title,
-        },
-        status: {
-          in: ['published', 'selected'],
-        },
+        status: { in: ['published', 'selected'] },
       },
+      select: { title: true },
+      take: 50,
     });
-    return existing !== null;
+
+    const getKeywords = (t: string) =>
+      new Set(
+        t
+          .toLowerCase()
+          .replace(/[^\w\s]/g, '')
+          .split(/\s+/)
+          .filter((w) => w.length > 3 && !['marvel', 'studios', 'news', 'reboot', 'reportedly', 'lands', 'role'].includes(w))
+      );
+
+    const targetKeywords = getKeywords(title);
+    if (targetKeywords.size === 0) return false;
+
+    for (const item of recentCovered) {
+      const existingKeywords = getKeywords(item.title);
+      let matchCount = 0;
+      for (const kw of targetKeywords) {
+        if (existingKeywords.has(kw)) matchCount++;
+      }
+
+      // If 2 or more key specific entities match (e.g. "kit", "connor", "cyclops"), it's the exact same news story!
+      if (matchCount >= 2 || (matchCount >= 1 && targetKeywords.size <= 2)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   static async getPendingTopics(agentId: string, limit: number = 10): Promise<Topic[]> {
@@ -100,14 +127,20 @@ export class TopicRepository {
     });
   }
 
-  static async recordDecision(topicId: string, decision: 'publish' | 'reject', scores: Record<string, number>, reason: string, model: string): Promise<EditorialDecision> {
+  static async recordDecision(
+    topicId: string,
+    decision: 'publish' | 'reject',
+    breakdown: any,
+    reason: string,
+    modelName: string = 'rule-engine'
+  ): Promise<EditorialDecision> {
     return prisma.editorialDecision.create({
       data: {
         topicId,
         decision,
-        scores: JSON.stringify(scores),
+        scores: JSON.stringify(breakdown),
         reason,
-        model,
+        model: modelName,
       },
     });
   }
